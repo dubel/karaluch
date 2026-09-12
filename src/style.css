@@ -78,36 +78,52 @@ canvas#game {
 .crosshair {
   position: absolute;
   left: 50%;
-  top: 48%;
-  width: 18px;
-  height: 18px;
+  top: 50%;
+  width: 72px;
+  height: 96px;
   transform: translate(-50%, -50%);
-  border: 1px solid #d7e39a;
-  border-radius: 50%;
-  opacity: 0.7;
 }
 
-.crosshair::before,
-.crosshair::after {
+.horizon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 1px;
+  transform: translate(-50%, -50%);
+  background: #d7e39a;
+  opacity: 0.55;
+}
+
+.horizon::before,
+.horizon::after {
   content: "";
   position: absolute;
-  background: #d7e39a;
-}
-
-.crosshair::before {
-  left: 50%;
-  top: -6px;
-  width: 1px;
-  height: 30px;
-  transform: translateX(-50%);
-}
-
-.crosshair::after {
   top: 50%;
-  left: -6px;
-  width: 30px;
-  height: 1px;
+  width: 1px;
+  height: 10px;
+  background: #d7e39a;
   transform: translateY(-50%);
+}
+
+.horizon::before {
+  left: 0;
+}
+
+.horizon::after {
+  right: 0;
+}
+
+.pitch-pip {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #e8f5a0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
 .hud-bottom {
@@ -145,6 +161,8 @@ canvas#game {
   font-size: 10px;
   letter-spacing: 0.04em;
   opacity: 0.55;
+  text-align: right;
+  line-height: 1.45;
 }
 
 .overlay {

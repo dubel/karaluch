@@ -52,10 +52,14 @@ export function normalizeModel(root: Object3D, targetLength: number): void {
   root.updateMatrixWorld(true)
 }
 
+function gltfName(name: string): string {
+  return name.replaceAll('.', '')
+}
+
 function collectNamed(root: Object3D, names: string[]): Object3D[] {
   const found: Object3D[] = []
   for (const name of names) {
-    const obj = root.getObjectByName(name)
+    const obj = root.getObjectByName(name) ?? root.getObjectByName(gltfName(name))
     if (obj) found.push(obj)
   }
   return found
@@ -102,7 +106,11 @@ export function applyRig(model: Object3D, config: RigConfig): TankRig {
   const gunParts = collectNamed(model, config.gunNames)
 
   visual.updateMatrixWorld(true)
-  const turretBox = bboxOf(turretParts) ?? new Box3().setFromObject(model)
+  const shieldParts = collectNamed(
+    model,
+    config.gunNames.filter((name) => /shield|mantlet/i.test(name)),
+  )
+  const turretBox = bboxOf(shieldParts) ?? bboxOf(turretParts) ?? new Box3().setFromObject(model)
   turretBox.getCenter(_center)
   turret.position.set(_center.x, _center.y, _center.z)
   visual.add(turret)
@@ -136,17 +144,20 @@ export function applyRig(model: Object3D, config: RigConfig): TankRig {
   gun.add(muzzle)
 
   visual.updateMatrixWorld(true)
-  const hullBox = new Box3().setFromObject(visual)
-  hullBox.getCenter(_center)
-  hullBox.getSize(_size)
-
-  const gunWorld = new Vector3()
-  muzzle.getWorldPosition(gunWorld)
-  const dx = gunWorld.x - _center.x
-  const dz = gunWorld.z - _center.z
-  if (dx * dx + dz * dz > 1e-6) {
-    visual.rotation.y -= Math.atan2(dx, dz)
-    visual.updateMatrixWorld(true)
+  const axisBox = bboxOf(gunParts) ?? bboxOf(turretParts)
+  if (axisBox) {
+    axisBox.getSize(_size)
+    axisBox.getCenter(_center)
+    let yaw = 0
+    if (_size.x > _size.z * 1.15) {
+      yaw = _center.x >= 0 ? Math.PI / 2 : -Math.PI / 2
+    } else if (_center.z < 0) {
+      yaw = Math.PI
+    }
+    if (Math.abs(yaw) > 1e-4) {
+      visual.rotation.y -= yaw
+      visual.updateMatrixWorld(true)
+    }
   }
 
   const aligned = new Box3().setFromObject(visual)

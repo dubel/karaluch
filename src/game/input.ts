@@ -8,6 +8,8 @@ export class Input {
   pointerLocked = false
 
   private readonly canvas: HTMLCanvasElement
+  private mouseFire = false
+  private spaceFire = false
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -44,25 +46,50 @@ export class Input {
 
   throttle(): number {
     let v = 0
-    if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) v += 1
-    if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) v -= 1
+    if (this.keys.has('ArrowUp')) v += 1
+    if (this.keys.has('ArrowDown')) v -= 1
+    return v
+  }
+
+  elevate(): number {
+    let v = 0
+    if (this.keys.has('KeyW')) v += 1
+    if (this.keys.has('KeyS')) v -= 1
     return v
   }
 
   steer(): number {
     let v = 0
-    if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) v += 1
-    if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) v -= 1
+    if (this.keys.has('ArrowLeft') || this.keys.has('KeyA')) v += 1
+    if (this.keys.has('ArrowRight') || this.keys.has('KeyD')) v -= 1
     return v
   }
 
   private onKeyDown = (event: KeyboardEvent): void => {
+    if (
+      event.code === 'Space' ||
+      event.code === 'ArrowUp' ||
+      event.code === 'ArrowDown' ||
+      event.code === 'ArrowLeft' ||
+      event.code === 'ArrowRight'
+    ) {
+      event.preventDefault()
+    }
+    if (event.code === 'Space') {
+      if (!this.keys.has('Space')) this.fireClicked = true
+      this.spaceFire = true
+      this.fireHeld = true
+    }
     this.keys.add(event.code)
     if (event.code === 'KeyR') this.restart = true
   }
 
   private onKeyUp = (event: KeyboardEvent): void => {
     this.keys.delete(event.code)
+    if (event.code === 'Space') {
+      this.spaceFire = false
+      this.fireHeld = this.mouseFire || this.spaceFire
+    }
   }
 
   private onMouseMove = (event: MouseEvent): void => {
@@ -73,13 +100,15 @@ export class Input {
 
   private onMouseDown = (event: MouseEvent): void => {
     if (event.button !== 0) return
+    this.mouseFire = true
     this.fireHeld = true
     this.fireClicked = true
   }
 
   private onMouseUp = (event: MouseEvent): void => {
     if (event.button !== 0) return
-    this.fireHeld = false
+    this.mouseFire = false
+    this.fireHeld = this.mouseFire || this.spaceFire
   }
 
   private onLockChange = (): void => {

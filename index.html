@@ -19,7 +19,10 @@
             <div class="hp-bar"><div id="hp-bot" class="hp-fill enemy"></div></div>
           </div>
         </div>
-        <div id="crosshair" class="crosshair"></div>
+        <div id="crosshair" class="crosshair">
+          <div class="horizon"></div>
+          <div id="pitch-pip" class="pitch-pip"></div>
+        </div>
         <div class="hud-bottom">
           <div id="reload" class="reload">
             <span>Działo</span>
@@ -27,7 +30,8 @@
           </div>
         </div>
         <div id="credits" class="credits">
-          TKS — Call_ada (CC-BY) · Pz.Kpfw. III — Stafford (CC-BY)
+          TKS — Call_ada (CC-BY) · Pz.Kpfw. III — Stafford (CC-BY)<br />
+          dźwięki: Nayckron (CC-BY silnik) · Thimras (CC0 strzał) · Spring Spring (CC0 wybuch)
         </div>
       </div>
       <div id="overlay" class="overlay">
@@ -36,9 +40,9 @@
           <p class="tag">TKS vs Pz.Kpfw. III</p>
           <p id="overlay-status" class="status">Ładowanie modeli… 0%</p>
           <ul>
-            <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> jazda kadłubem</li>
-            <li><kbd>Mysz</kbd> wieża / lufa</li>
-            <li><kbd>LPM</kbd> ogień</li>
+            <li><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> jazda kadłubem (←/→ — celowanie w bok)</li>
+            <li><kbd>Mysz</kbd> <kbd>W</kbd><kbd>S</kbd> elewacja lufy</li>
+            <li><kbd>LPM</kbd> <kbd>Spacja</kbd> ogień</li>
             <li><kbd>R</kbd> restart rundy</li>
           </ul>
           <button id="play-btn" type="button" disabled>Czekaj na modele</button>

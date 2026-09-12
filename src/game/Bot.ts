@@ -1,6 +1,6 @@
 import { Vector3 } from 'three'
 import type { Aabb } from './collision'
-import { ARENA_HALF } from './Arena'
+import { ARENA_HALF } from './config'
 import type { Tank } from './Tank'
 import type { Projectile } from './Projectile'
 

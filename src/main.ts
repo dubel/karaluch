@@ -12,5 +12,6 @@ const game = new Game(canvas, hud)
 
 game.start().catch((error: unknown) => {
   console.error(error)
-  hud.setStatus('Nie udało się załadować modeli.')
+  const message = error instanceof Error ? error.message : String(error)
+  hud.setStatus(`Nie udało się załadować modeli. ${message}`)
 })

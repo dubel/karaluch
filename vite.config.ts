@@ -6,5 +6,5 @@ export default defineConfig({
     port: 5173,
     host: true,
   },
-  assetsInclude: ['**/*.glb'],
+  assetsInclude: ['**/*.glb', '**/*.ogg', '**/*.wav'],
 })

@@ -5,6 +5,7 @@ export class Hud {
   private readonly hpPlayer: HTMLElement
   private readonly hpBot: HTMLElement
   private readonly reload: HTMLElement
+  private readonly pitchPip: HTMLElement
 
   constructor() {
     this.overlay = this.el('#overlay')
@@ -13,6 +14,7 @@ export class Hud {
     this.hpPlayer = this.el('#hp-player')
     this.hpBot = this.el('#hp-bot')
     this.reload = this.el('#reload-fill')
+    this.pitchPip = this.el('#pitch-pip')
   }
 
   onPlay(handler: () => void): void {
@@ -47,10 +49,22 @@ export class Hud {
     this.overlay.classList.add('hidden')
   }
 
-  update(playerHp: number, playerMax: number, botHp: number, botMax: number, reload: number): void {
+  update(
+    playerHp: number,
+    playerMax: number,
+    botHp: number,
+    botMax: number,
+    reload: number,
+    gunPitch: number,
+    pitchMin: number,
+    pitchMax: number,
+  ): void {
     this.hpPlayer.style.width = `${(playerHp / playerMax) * 100}%`
     this.hpBot.style.width = `${(botHp / botMax) * 100}%`
     this.reload.style.width = `${Math.max(0, Math.min(1, reload)) * 100}%`
+    const span = Math.max(pitchMax, Math.abs(pitchMin), 0.01)
+    const y = (-gunPitch / span) * 42
+    this.pitchPip.style.transform = `translate(-50%, calc(-50% + ${y}px))`
   }
 
   roundOver(won: boolean): void {

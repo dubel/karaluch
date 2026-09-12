@@ -19,25 +19,31 @@ export type RigConfig = {
 
 const playerUrl = new URL('../../assets/tks_20mm_tankette.glb', import.meta.url).href
 const botUrl = new URL('../../assets/tank_pz_kpfw_iii_ausf_b__1937.glb', import.meta.url).href
+export const HOUSE_URL = new URL(
+  '../../assets/painted_house_-_zalipie_in_southern_poland.glb',
+  import.meta.url,
+).href
+export const HOUSE_TARGET_LENGTH = 14
+/** Playable half-extent; 84/42 doubles the side and quadruples the surface. */
+export const ARENA_HALF = 84
+export const FOLIAGE_URL = new URL('../../assets/low_poly_trees_flowers_and_grass.glb', import.meta.url).href
+export const GRASS_PATCH_URL = new URL('../../assets/grass_patches_-_circle.glb', import.meta.url).href
+export const TREE_HEIGHT = 9.5
+export const PLAYER_SPAWN = { x: -48, z: 44, yaw: Math.PI * 0.72 }
+export const BOT_SPAWN = { x: 48, z: -40, yaw: -Math.PI * 0.28 }
 
 export const PLAYER_RIG: RigConfig = {
   url: playerUrl,
   targetLength: 2.6,
-  turretNames: [
-    'GunShield_low.001',
-    'Begin_Tube_low.001',
-    'End_Tube_low.001',
-    'Cylinder_low.001',
-    '20MM_low',
-  ],
-  gunNames: ['Begin_Tube_low.001', 'End_Tube_low.001', '20MM_low'],
-  turretYawLimit: 0.44,
+  turretNames: ['GunShield_low.001', '20MM_low'],
+  gunNames: ['GunShield_low.001', '20MM_low'],
+  turretYawLimit: 0,
   gunPitchMin: -0.12,
   gunPitchMax: 0.32,
   maxHp: 80,
   moveSpeed: 9,
   reverseSpeed: 4.2,
-  turnSpeed: 1.45,
+  turnSpeed: 2.25,
   turretTurnSpeed: 2.4,
   fireCooldown: 0.85,
   damage: 24,

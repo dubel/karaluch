@@ -3,6 +3,8 @@ export type Aabb = {
   maxX: number
   minZ: number
   maxZ: number
+  minY?: number
+  maxY?: number
 }
 
 function projectRadius(
@@ -129,4 +131,66 @@ export function pointHitsObb(
   const localX = dx * c + dz * -s
   const localZ = dx * s + dz * c
   return Math.abs(localX) <= halfW && Math.abs(localZ) <= halfL
+}
+
+export function raycastAabb(
+  ox: number,
+  oy: number,
+  oz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  maxT: number,
+  box: Aabb,
+): number | null {
+  const minY = box.minY ?? 0
+  const maxY = box.maxY ?? 6
+  let tMin = 0
+  let tMax = maxT
+
+  const slabs: Array<[number, number, number, number]> = [
+    [ox, dx, box.minX, box.maxX],
+    [oy, dy, minY, maxY],
+    [oz, dz, box.minZ, box.maxZ],
+  ]
+
+  for (const [origin, dir, min, max] of slabs) {
+    if (Math.abs(dir) < 1e-8) {
+      if (origin < min || origin > max) return null
+      continue
+    }
+    let t1 = (min - origin) / dir
+    let t2 = (max - origin) / dir
+    if (t1 > t2) {
+      const swap = t1
+      t1 = t2
+      t2 = swap
+    }
+    tMin = Math.max(tMin, t1)
+    tMax = Math.min(tMax, t2)
+    if (tMin > tMax) return null
+  }
+
+  if (tMin > maxT) return null
+  if (tMin > 0) return tMin
+  if (tMax > 0) return 0
+  return null
+}
+
+export function raycastObstacles(
+  ox: number,
+  oy: number,
+  oz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  maxT: number,
+  boxes: Aabb[],
+): number | null {
+  let best: number | null = null
+  for (const box of boxes) {
+    const t = raycastAabb(ox, oy, oz, dx, dy, dz, maxT, box)
+    if (t !== null && (best === null || t < best)) best = t
+  }
+  return best
 }

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Karaluch — arena czołgów</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game"></canvas>
+      <div id="hud" class="hud">
+        <div class="hud-top">
+          <div class="hp-block">
+            <span class="hp-label">TKS</span>
+            <div class="hp-bar"><div id="hp-player" class="hp-fill player"></div></div>
+          </div>
+          <div class="hp-block enemy">
+            <span class="hp-label">Pz.Kpfw. III</span>
+            <div class="hp-bar"><div id="hp-bot" class="hp-fill enemy"></div></div>
+          </div>
+        </div>
+        <div id="crosshair" class="crosshair"></div>
+        <div class="hud-bottom">
+          <div id="reload" class="reload">
+            <span>Działo</span>
+            <div class="reload-bar"><div id="reload-fill"></div></div>
+          </div>
+        </div>
+        <div id="credits" class="credits">
+          TKS — Call_ada (CC-BY) · Pz.Kpfw. III — Stafford (CC-BY)
+        </div>
+      </div>
+      <div id="overlay" class="overlay">
+        <div class="overlay-card">
+          <h1>KARALUCH</h1>
+          <p class="tag">TKS vs Pz.Kpfw. III</p>
+          <p id="overlay-status" class="status">Ładowanie modeli… 0%</p>
+          <ul>
+            <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> jazda kadłubem</li>
+            <li><kbd>Mysz</kbd> wieża / lufa</li>
+            <li><kbd>LPM</kbd> ogień</li>
+            <li><kbd>R</kbd> restart rundy</li>
+          </ul>
+          <button id="play-btn" type="button" disabled>Czekaj na modele</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

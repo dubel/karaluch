@@ -39,6 +39,12 @@ const BEACON_ALLY = new MeshStandardMaterial({
   opacity: 0.94,
 })
 const _beaconWorld = new Quaternion()
+let beaconsOn = true
+
+export function toggleBeacons(): boolean {
+  beaconsOn = !beaconsOn
+  return beaconsOn
+}
 
 function wrapPi(angle: number): number {
   let a = angle
@@ -234,6 +240,7 @@ export class Tank {
     const pulse = 0.5 + 0.5 * Math.sin(t * 2.35)
     this.beacon.position.y = this.height + 1.18 + Math.sin(t * 2.05) * 0.34
     this.beacon.scale.setScalar(0.94 + pulse * 0.14)
+    this.beacon.visible = beaconsOn
     this.object.getWorldQuaternion(_beaconWorld)
     this.beacon.quaternion.copy(_beaconWorld).invert()
   }

@@ -6,6 +6,7 @@ export class Input {
   fireClicked = false
   restart = false
   artillery = false
+  markers = false
   pointerLocked = false
 
   private readonly canvas: HTMLCanvasElement
@@ -37,6 +38,7 @@ export class Input {
     this.mouseFire = false
     this.spaceFire = false
     this.artillery = false
+    this.markers = false
   }
 
   private canFire(): boolean {
@@ -66,6 +68,12 @@ export class Input {
     const fired = this.artillery
     this.artillery = false
     return fired
+  }
+
+  consumeMarkers(): boolean {
+    const toggled = this.markers
+    this.markers = false
+    return toggled
   }
 
   throttle(): number {
@@ -108,6 +116,7 @@ export class Input {
     }
     if (event.code === 'KeyR') this.restart = true
     if (event.code === 'KeyA') this.artillery = true
+    if (event.code === 'KeyM') this.markers = true
   }
 
   private onKeyUp = (event: KeyboardEvent): void => {

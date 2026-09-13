@@ -34,7 +34,7 @@ import {
 } from './config'
 import { Input } from './input'
 import { Projectile } from './Projectile'
-import { Tank } from './Tank'
+import { Tank, toggleBeacons } from './Tank'
 import { raycastTerrain } from './terrain'
 import { TrackMarks } from './TrackMarks'
 import { GameAudio } from './audio'
@@ -260,6 +260,10 @@ export class Game {
       this.player.applyAimPose()
       this.player.tickCooldown(dt)
       if (this.input.consumeArtillery()) this.callArtillery()
+      if (this.input.consumeMarkers()) {
+        const on = toggleBeacons()
+        this.hud.flash(on ? 'Znaczniki włączone' : 'Znaczniki wyłączone')
+      }
       const repairing = this.workshop.contains(this.player.position.x, this.player.position.z)
       if (repairing) {
         this.player.heal(this.player.config.maxHp * WORKSHOP_HEAL_RATE * dt)

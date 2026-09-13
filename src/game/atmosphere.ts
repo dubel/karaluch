@@ -5,7 +5,7 @@ import {
   CanvasTexture,
   Color,
   DirectionalLight,
-  Fog,
+  FogExp2,
   HemisphereLight,
   Mesh,
   Points,
@@ -21,25 +21,35 @@ export const atmosWetness = { value: 0 }
 
 export type WeatherId = 'clear' | 'clouds' | 'overcast' | 'rain' | 'storm'
 
+type Range = readonly [number, number]
+
 type WeatherSpec = {
-  cover: number
-  rain: number
-  wind: number
-  dark: number
+  cover: Range
+  rain: Range
+  wind: Range
+  dark: Range
   label: string
   weight: number
 }
 
+type WeatherSample = {
+  id: WeatherId
+  cover: number
+  rain: number
+  wind: number
+  dark: number
+}
+
 const WEATHER: Record<WeatherId, WeatherSpec> = {
-  clear: { cover: 0.05, rain: 0, wind: 0.34, dark: 0, label: 'bezchmurnie', weight: 26 },
-  clouds: { cover: 0.4, rain: 0, wind: 0.52, dark: 0.1, label: 'zachmurzenie', weight: 34 },
-  overcast: { cover: 0.78, rain: 0.04, wind: 0.7, dark: 0.36, label: 'pochmurno', weight: 18 },
-  rain: { cover: 0.9, rain: 0.72, wind: 1.12, dark: 0.5, label: 'deszcz', weight: 16 },
-  storm: { cover: 0.97, rain: 1, wind: 1.82, dark: 0.66, label: 'ulewa', weight: 6 },
+  clear: { cover: [0.02, 0.2], rain: [0, 0], wind: [0.2, 0.62], dark: [0, 0.08], label: 'bezchmurnie', weight: 24 },
+  clouds: { cover: [0.26, 0.6], rain: [0, 0.04], wind: [0.38, 0.9], dark: [0.04, 0.2], label: 'zachmurzenie', weight: 32 },
+  overcast: { cover: [0.62, 0.88], rain: [0, 0.14], wind: [0.5, 1.05], dark: [0.22, 0.46], label: 'pochmurno', weight: 18 },
+  rain: { cover: [0.78, 0.96], rain: [0.42, 0.88], wind: [0.85, 1.45], dark: [0.38, 0.58], label: 'deszcz', weight: 16 },
+  storm: { cover: [0.9, 1], rain: [0.82, 1], wind: [1.45, 2.15], dark: [0.55, 0.78], label: 'ulewa', weight: 6 },
 }
 
 const IDS = Object.keys(WEATHER) as WeatherId[]
-const DAY_LENGTH_SEC = 16 * 60
+const DAY_LENGTH_SEC = 8 * 60
 const LAT = (50.1 * Math.PI) / 180
 const SUN_DEC = (3.4 * Math.PI) / 180
 const MOON_DEC = (-9.5 * Math.PI) / 180
@@ -74,15 +84,21 @@ function wrapHour(hour: number): number {
   return ((hour % 24) + 24) % 24
 }
 
-function parseQuery(): { hour: number; weather: WeatherId | null; freeze: boolean } {
+function parseQuery(): { hour: number; weather: WeatherId | null; freeze: boolean; mist: number | null } {
   const q = new URLSearchParams(window.location.search)
   const rawHour = Number(q.get('hour'))
   const weather = q.get('weather') as WeatherId | null
+  const mistRaw = q.get('mist')
   return {
     hour: Number.isFinite(rawHour) ? wrapHour(rawHour) : 17.15,
     weather: weather && weather in WEATHER ? weather : null,
     freeze: q.get('pauseday') === '1',
+    mist: mistRaw === '1' ? 1 : mistRaw === '0' ? 0 : null,
   }
+}
+
+function sample(range: Range): number {
+  return range[0] + Math.random() * (range[1] - range[0])
 }
 
 function pickWeather(exclude: WeatherId | null): WeatherId {
@@ -95,6 +111,25 @@ function pickWeather(exclude: WeatherId | null): WeatherId {
     if (roll <= 0) return id
   }
   return 'clouds'
+}
+
+function rollWeather(exclude: WeatherId | null, forced?: WeatherId): WeatherSample {
+  const id = forced ?? pickWeather(exclude)
+  const spec = WEATHER[id]
+  return {
+    id,
+    cover: sample(spec.cover),
+    rain: sample(spec.rain),
+    wind: sample(spec.wind),
+    dark: sample(spec.dark),
+  }
+}
+
+function weatherLabel(id: WeatherId, rain: number, mist: number): string {
+  const foggy = mist > 0.42
+  if (foggy && rain > 0.45) return id === 'storm' ? 'ulewa i mgła' : 'deszcz i mgła'
+  if (foggy) return 'mgła'
+  return WEATHER[id].label
 }
 
 function bodyDir(hour: number, decl: number, into: Vector3): number {
@@ -121,7 +156,8 @@ export class Atmosphere {
   private readonly windClock: WindClock
   private readonly freeze: boolean
   private readonly lockWeather: boolean
-  private readonly fog: Fog
+  private readonly lockMist: number | null
+  private readonly fog: FogExp2
   private readonly hemi: HemisphereLight
   private readonly sun: DirectionalLight
   private readonly moon: DirectionalLight
@@ -130,10 +166,16 @@ export class Atmosphere {
   private readonly sky: Mesh
   private readonly rainPts: Points
   private hour: number
-  private weather: WeatherId
-  private nextWeather: WeatherId
+  private from: WeatherSample
+  private to: WeatherSample
   private blend = 1
+  private blendDur = 12
   private hold = 8
+  private mist = 0
+  private mistGoal = 0
+  private mistPhase: 'idle' | 'in' | 'hold' | 'out' = 'idle'
+  private mistTimer = 0
+  private mistCd = 18
   private flash = 0
   private flashCd = 4
   private time = 0
@@ -145,12 +187,19 @@ export class Atmosphere {
     this.hour = boot.hour
     this.freeze = boot.freeze
     this.lockWeather = Boolean(boot.weather)
-    this.weather = boot.weather ?? pickWeather(null)
-    this.nextWeather = this.weather
-    this.hold = 12 + Math.random() * 28
+    this.lockMist = boot.mist
+    this.from = rollWeather(null, boot.weather ?? undefined)
+    this.to = this.from
+    this.hold = 10 + Math.random() * 22
+    this.mistCd = 14 + Math.random() * 28
+    if (this.lockMist === 1) {
+      this.mist = 1
+      this.mistGoal = 1
+      this.mistPhase = 'hold'
+    }
 
     scene.background = new Color(0x6b7c8a)
-    this.fog = new Fog(0x6b7c8a, 140, 520)
+    this.fog = new FogExp2(0x6b7c8a, 0.0034)
     scene.fog = this.fog
 
     this.hemi = new HemisphereLight(0xc5d4e0, 0x4a4030, 0.85)
@@ -192,17 +241,16 @@ export class Atmosphere {
     if (!this.freeze) this.hour = wrapHour(this.hour + (dt * 24) / DAY_LENGTH_SEC)
     this.stepWeather(dt)
 
-    const from = WEATHER[this.weather]
-    const to = WEATHER[this.nextWeather]
     const k = this.blend
-    const cover = lerp(from.cover, to.cover, k)
-    const rain = lerp(from.rain, to.rain, k)
-    const wind = lerp(from.wind, to.wind, k)
-    const dark = lerp(from.dark, to.dark, k)
-    const fromL = from.label
-    const toL = to.label
+    const coverDrift = 0.045 * Math.sin(this.time * 0.13 + 1.4) + 0.03 * Math.sin(this.time * 0.31)
+    const cover = clamp(lerp(this.from.cover, this.to.cover, k) + coverDrift, 0, 1)
+    const rain = lerp(this.from.rain, this.to.rain, k)
+    const wind = lerp(this.from.wind, this.to.wind, k)
+    const dark = lerp(this.from.dark, this.to.dark, k)
+    const weatherId = k > 0.45 ? this.to.id : this.from.id
     this.rain = rain
     this.wind = wind
+    this.stepMist(dt, this.hour, rain)
     this.wetness += (rain - this.wetness) * Math.min(1, dt * 0.45)
     atmosWetness.value = this.wetness
 
@@ -222,29 +270,34 @@ export class Atmosphere {
     const golden = Math.exp(-(((sunAlt - 0.06) / 0.12) ** 2)) * (1 - night * 0.7)
     const twilight = smooth(0.18, -0.04, sunAlt) * smooth(-0.38, -0.02, sunAlt)
 
-    paintSky(sunAlt, night, golden, twilight, cover, dark, this.flash)
+    paintSky(sunAlt, night, golden, twilight, cover, dark, this.flash, this.mist)
     const occ = cover * (0.5 + 0.25 * (0.5 + 0.5 * Math.sin(this.time * 0.17)))
-    const sunLit = smooth(-0.12, 0.1, sunAlt) * (1 - occ * 0.72) * (1 - dark * 0.18)
+    const sunLit =
+      smooth(-0.12, 0.1, sunAlt) * (1 - occ * 0.72) * (1 - dark * 0.18) * (1 - this.mist * 0.5)
     const moonLit = smooth(-0.04, 0.14, moonAlt) * night * (0.45 + 0.55 * (1 - cover * 0.5))
 
     this.sun.color.copy(_sunCol)
     this.sun.intensity = sunLit * 1.48 + this.flash * 1.8
     this.sun.castShadow = this.sun.intensity > 0.1
     this.moon.color.copy(_moonCol)
-    this.moon.intensity = moonLit * 0.55 + night * 0.06
+    this.moon.intensity = (moonLit * 0.55 + night * 0.06) * (1 - this.mist * 0.35)
     this.hemi.color.copy(_hemiSky)
     this.hemi.groundColor.copy(_hemiGround)
     this.hemi.intensity =
-      0.28 + day * 0.62 * (1 - dark * 0.4) + twilight * 0.32 + moonLit * 0.34 + this.flash * 1.4
+      0.28 +
+      day * 0.62 * (1 - dark * 0.4) +
+      twilight * 0.32 +
+      moonLit * 0.34 +
+      this.mist * 0.1 +
+      this.flash * 1.4
 
     this.placeLight(this.sun, _sunDir, follow, 210)
     this.placeLight(this.moon, _moonDir, follow, 180)
 
     this.fog.color.copy(_fog)
     this.scene.background = this.fog.color
-    const fogPull = 0.35 + cover * 0.28 + rain * 0.42 + night * 0.18
-    this.fog.near = lerp(165, 42, fogPull)
-    this.fog.far = lerp(560, 210, fogPull)
+    const fogPull = 0.28 + cover * 0.2 + rain * 0.3 + night * 0.1
+    this.fog.density = 0.0017 + fogPull * 0.0042 + this.mist * 0.016
 
     this.sky.position.copy(camera.position)
     const u = this.skyMat.uniforms
@@ -272,8 +325,7 @@ export class Atmosphere {
 
     const hh = Math.floor(this.hour)
     const mm = Math.floor((this.hour - hh) * 60)
-    const weatherLabel = k > 0.45 ? toL : fromL
-    this.label = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')} · ${weatherLabel}`
+    this.label = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')} · ${weatherLabel(weatherId, rain, this.mist)}`
   }
 
   private placeLight(light: DirectionalLight, dir: Vector3, follow: Vector3, dist: number): void {
@@ -291,17 +343,63 @@ export class Atmosphere {
   private stepWeather(dt: number): void {
     if (this.lockWeather) return
     if (this.blend < 1) {
-      this.blend = clamp(this.blend + dt / 12, 0, 1)
+      this.blend = clamp(this.blend + dt / this.blendDur, 0, 1)
       if (this.blend >= 1) {
-        this.weather = this.nextWeather
-        this.hold = 40 + Math.random() * 55
+        this.from = this.to
+        this.hold = 16 + Math.random() * 38
       }
       return
     }
     this.hold -= dt
     if (this.hold > 0) return
-    this.nextWeather = pickWeather(this.weather)
+    this.to = rollWeather(this.from.id)
     this.blend = 0
+    this.blendDur = 7 + Math.random() * 12
+  }
+
+  private stepMist(dt: number, hour: number, rain: number): void {
+    if (this.lockMist !== null) {
+      this.mist += (this.lockMist - this.mist) * Math.min(1, dt * 1.2)
+      return
+    }
+    if (this.mistPhase === 'idle') {
+      this.mistCd -= dt
+      this.mist += (0 - this.mist) * Math.min(1, dt * 0.55)
+      if (this.mistCd > 0) return
+      const dawn = hour > 5.2 && hour < 8.8
+      const dusk = hour > 17 && hour < 20.2
+      const chance = 0.38 + rain * 0.28 + (dawn ? 0.32 : 0) + (dusk ? 0.18 : 0)
+      if (Math.random() < chance) {
+        this.mistPhase = 'in'
+        this.mistGoal = 0.52 + Math.random() * 0.48
+        this.mistTimer = 8 + Math.random() * 10
+      } else {
+        this.mistCd = 16 + Math.random() * 42
+      }
+      return
+    }
+    if (this.mistPhase === 'in') {
+      this.mistTimer -= dt
+      this.mist += (this.mistGoal - this.mist) * Math.min(1, dt * 0.28)
+      if (this.mistTimer > 0) return
+      this.mistPhase = 'hold'
+      this.mistTimer = 14 + Math.random() * 28
+      return
+    }
+    if (this.mistPhase === 'hold') {
+      this.mistTimer -= dt
+      this.mist += (this.mistGoal - this.mist) * Math.min(1, dt * 0.2)
+      if (this.mistTimer > 0) return
+      this.mistPhase = 'out'
+      this.mistTimer = 10 + Math.random() * 12
+      return
+    }
+    this.mistTimer -= dt
+    this.mist += (0 - this.mist) * Math.min(1, dt * 0.22)
+    if (this.mistTimer > 0) return
+    this.mistPhase = 'idle'
+    this.mist = 0
+    this.mistCd = 22 + Math.random() * 48
   }
 
   private stepLightning(dt: number, rain: number, wind: number): void {
@@ -324,6 +422,7 @@ function paintSky(
   cover: number,
   dark: number,
   flash: number,
+  mist: number,
 ): void {
   _zenith.set(0x3a6aa6)
   _horizon.set(0xb9cce0)
@@ -373,7 +472,10 @@ function paintSky(
 
   _hemiSky.copy(_horizon).lerp(_zenith, 0.35)
   _hemiGround.set(0x4a4030).lerp(_tmp.set(0x14161c), night)
-  _fog.copy(_horizon)
+  _tmp.set(night > 0.45 ? 0x1a2230 : 0x6a7682)
+  _horizon.lerp(_tmp, mist * 0.5)
+  _zenith.lerp(_horizon, mist * 0.35)
+  _fog.copy(_horizon).lerp(_zenith, 0.18)
   _ground.copy(_horizon).multiplyScalar(0.55)
 }
 

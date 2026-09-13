@@ -6,9 +6,11 @@ import {
   Color,
   DynamicDrawUsage,
   NormalBlending,
+  PointLight,
   Points,
   PointsMaterial,
   Vector3,
+  type Scene,
 } from 'three'
 
 type Kind = 'spark' | 'smoke' | 'fire'
@@ -25,9 +27,10 @@ type Particle = {
   size: number
 }
 
-const SPARK_MAX = 180
-const SMOKE_MAX = 120
+const SPARK_MAX = 260
+const SMOKE_MAX = 360
 const _c = new Color()
+const _puff = new Vector3()
 
 export class CombatFx {
   readonly sparks: Points
@@ -38,6 +41,8 @@ export class CombatFx {
   private readonly sparkCol: Float32Array
   private readonly smokePos: Float32Array
   private readonly smokeCol: Float32Array
+  private readonly wrecks: { x: number; y: number; z: number; light: PointLight; t: number }[] = []
+  private puffAcc = 0
 
   constructor() {
     const sparkTex = circleTexture('rgba(255,220,120,1)', 'rgba(255,80,0,0)')
@@ -71,7 +76,27 @@ export class CombatFx {
     for (let i = 0; i < 26; i++) this.spawnSmoke(at, 4.2)
   }
 
+  igniteWreck(scene: Scene, at: Vector3, height: number): void {
+    const light = new PointLight(0xff5a14, 5.5, 22, 2)
+    light.position.set(at.x, at.y + height * 0.55, at.z)
+    light.castShadow = false
+    scene.add(light)
+    this.wrecks.push({ x: at.x, y: at.y + height * 0.42, z: at.z, light, t: Math.random() * 12 })
+  }
+
   update(dt: number): void {
+    this.puffAcc += dt
+    const puff = this.puffAcc > 0.1
+    if (puff) this.puffAcc = 0
+    for (const wreck of this.wrecks) {
+      wreck.t += dt
+      wreck.light.intensity = 3.8 + Math.sin(wreck.t * 3.4) * 1.6 + Math.sin(wreck.t * 7.1) * 0.7
+      if (puff) {
+        _puff.set(wreck.x + (Math.random() - 0.5) * 0.8, wreck.y, wreck.z + (Math.random() - 0.5) * 0.8)
+        this.spawnSmoke(_puff, 1.6)
+        if (Math.random() < 0.55) this.spawnFire(_puff)
+      }
+    }
     stepSparks(this.sparkList, this.sparkPos, this.sparkCol, dt, SPARK_MAX)
     stepSmoke(this.smokeList, this.smokePos, this.smokeCol, dt, SMOKE_MAX)
     this.sparks.geometry.attributes.position.needsUpdate = true
@@ -87,6 +112,8 @@ export class CombatFx {
     this.smokeList.length = 0
     this.sparks.geometry.setDrawRange(0, 0)
     this.smoke.geometry.setDrawRange(0, 0)
+    for (const wreck of this.wrecks) wreck.light.removeFromParent()
+    this.wrecks.length = 0
   }
 
   private spawnSpark(at: Vector3, speed: number): void {
@@ -135,8 +162,8 @@ export class CombatFx {
       vy: lift * (0.5 + Math.random() * 0.6),
       vz: dir.z * 0.6,
       life: 0,
-      max: 2.2 + Math.random() * 1.4,
-      size: 0.4,
+      max: 3.4 + Math.random() * 2.2,
+      size: 0.55,
     })
   }
 }

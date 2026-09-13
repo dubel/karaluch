@@ -33,7 +33,7 @@ Tajemnicą tego sukcesu jest niska, zwrotna tankietka TKS, uzbrojona w zabójcze
 
 Obejmujesz dowodzenie nad maszyną w plutonie kaprala podchorążego Edmunda Orlika. Niemiecka machina pancerna rusza właśnie do kontrataku na wieś Sieraków, próbując odciąć drogę odwrotu polskim oddziałom zmierzającym do Warszawy.
 
-Twój cel: utrzymać pozycje, osłonić odwrót sojuszników i zamienić Sieraków w cmentarzysko niemieckich czołgów.
+Twój cel: jak najdłużej osłaniać odwrót sojuszników. Nie pokonasz ich wszystkich — ale każda zniszczona maszyna to minuta życia dla tych, którzy idą do Warszawy.
 
 Powodzenia, żołnierzu!`
 

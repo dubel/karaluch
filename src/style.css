@@ -56,8 +56,17 @@ canvas#game {
   min-width: 220px;
 }
 
-.hp-block.enemy {
+.hp-block.score {
   text-align: right;
+}
+
+.kills {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #e8c48a;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);
+  line-height: 1;
 }
 
 .hp-label {
@@ -192,7 +201,7 @@ canvas#game {
 }
 
 .overlay-card {
-  width: min(420px, 90vw);
+  width: min(480px, 90vw);
   padding: 28px 32px;
   border: 1px solid #6d7a48;
   background: #14180f;
@@ -226,6 +235,26 @@ canvas#game {
   text-align: left;
   line-height: 1.9;
   font-size: 14px;
+}
+
+.mission-stats {
+  margin: 16px 0 22px;
+  text-align: left;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid #2c341c;
+  font-size: 14px;
+  color: #c9d4a6;
+}
+
+.stat-row strong {
+  color: #f0e6b0;
+  font-weight: 600;
 }
 
 kbd {

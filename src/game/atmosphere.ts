@@ -49,7 +49,9 @@ const WEATHER: Record<WeatherId, WeatherSpec> = {
 }
 
 const IDS = Object.keys(WEATHER) as WeatherId[]
-const DAY_LENGTH_SEC = 8 * 60
+/** Real seconds that map to one in-game day. */
+export const GAME_DAY_SECONDS = 8 * 60
+const DAY_LENGTH_SEC = GAME_DAY_SECONDS
 const LAT = (50.1 * Math.PI) / 180
 const SUN_DEC = (3.4 * Math.PI) / 180
 const MOON_DEC = (-9.5 * Math.PI) / 180
@@ -186,6 +188,7 @@ export class Atmosphere {
   private readonly sky: Mesh
   private readonly rainPts: Points
   private hour: number
+  private readonly bootHour: number
   private from: WeatherSample
   private to: WeatherSample
   private blend = 1
@@ -208,6 +211,10 @@ export class Atmosphere {
     return this.hour
   }
 
+  resetMissionClock(): void {
+    this.hour = this.bootHour
+  }
+
   consumeThunder(): { volume: number; far: boolean } | null {
     const event = this.thunderEvent
     this.thunderEvent = null
@@ -219,6 +226,7 @@ export class Atmosphere {
     this.windClock = wind
     const boot = parseQuery()
     this.hour = boot.hour
+    this.bootHour = boot.hour
     this.freeze = boot.freeze
     this.lockWeather = boot.lockWeather
     this.lockMist = boot.lockMist

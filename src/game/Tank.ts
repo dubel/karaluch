@@ -80,10 +80,10 @@ export class Tank {
       mesh.castShadow = true
       mesh.receiveShadow = true
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-      for (const mat of mats) {
-        if (mat instanceof MeshStandardMaterial) {
-          this.dimMaterials.push(mat)
-        }
+      const cloned = mats.map((mat) => (mat instanceof MeshStandardMaterial ? mat.clone() : mat))
+      mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0]
+      for (const mat of cloned) {
+        if (mat instanceof MeshStandardMaterial) this.dimMaterials.push(mat)
       }
     })
   }
@@ -115,6 +115,7 @@ export class Tank {
         mat.color.copy(mat.userData.baseColor)
       }
       mat.emissive.setHex(0x000000)
+      mat.emissiveIntensity = 1
     }
   }
 
@@ -130,8 +131,9 @@ export class Tank {
         if (!mat.userData.baseColor) {
           mat.userData.baseColor = mat.color.clone()
         }
-        mat.color.multiplyScalar(0.35)
-        mat.emissive.setHex(0x220000)
+        mat.color.multiplyScalar(0.28)
+        mat.emissive.setHex(0x6a2208)
+        mat.emissiveIntensity = 0.7
       }
       return true
     }
@@ -155,7 +157,7 @@ export class Tank {
     dt: number,
     obstacles: Aabb[],
     halfArena: number,
-    other?: Tank,
+    others: Tank[] = [],
   ): void {
     if (!this.alive) return
     const turn = steer * this.config.turnSpeed * dt
@@ -178,22 +180,24 @@ export class Tank {
 
     const tryPos = (x: number, z: number, y: number): boolean => {
       if (collidesAny(x, z, y, this.halfWidth, this.halfLength, obstacles)) return false
-      if (
-        other?.alive &&
-        obbHitsObb(
-          x,
-          z,
-          y,
-          this.halfWidth,
-          this.halfLength,
-          other.object.position.x,
-          other.object.position.z,
-          other.hullYaw,
-          other.halfWidth,
-          other.halfLength,
-        )
-      ) {
-        return false
+      for (const other of others) {
+        if (other === this) continue
+        if (
+          obbHitsObb(
+            x,
+            z,
+            y,
+            this.halfWidth,
+            this.halfLength,
+            other.object.position.x,
+            other.object.position.z,
+            other.hullYaw,
+            other.halfWidth,
+            other.halfLength,
+          )
+        ) {
+          return false
+        }
       }
       return true
     }
@@ -321,6 +325,7 @@ export class Tank {
       _dir,
       this.config.projectileSpeed,
       this.config.damage,
+      this.id === 'player' ? 'player' : 'enemy',
     )
   }
 }

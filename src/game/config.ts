@@ -90,7 +90,18 @@ export const GRASS_PATCH_URL = new URL('../../assets/grass_patches_-_circle.glb'
 export const ROAD_DIFF_URL = new URL('../../assets/textures/muddy_tracks_diff_2k.jpg', import.meta.url).href
 export const TREE_HEIGHT = 9.5
 export const PLAYER_SPAWN = { x: -96, z: 88, yaw: Math.PI * 0.72 }
-export const BOT_SPAWN = { x: 96, z: -80, yaw: -Math.PI * 0.28 }
+/** SE road past the village — opposite the TKS approach. */
+export const ENEMY_SPAWNS = [
+  { x: 96, z: -80, yaw: Math.atan2(-96, 80) },
+  { x: 112, z: -96, yaw: Math.atan2(-112, 96) },
+  { x: 80, z: -66, yaw: Math.atan2(-80, 66) },
+] as const
+export const BOT_SPAWN = ENEMY_SPAWNS[0]
+
+export function waveEnemyCount(waveIndex: number): number {
+  if (waveIndex < 2) return 1
+  return 1 + Math.floor(Math.random() * 3)
+}
 
 export const PLAYER_RIG: RigConfig = {
   url: playerUrl,
@@ -100,13 +111,13 @@ export const PLAYER_RIG: RigConfig = {
   turretYawLimit: 0,
   gunPitchMin: -0.12,
   gunPitchMax: 0.32,
-  maxHp: 80,
+  maxHp: 9,
   moveSpeed: 9,
   reverseSpeed: 4.2,
   turnSpeed: 2.25,
   turretTurnSpeed: 2.4,
   fireCooldown: 0.85,
-  damage: 24,
+  damage: 1,
   projectileSpeed: 72,
   cameraDistance: 11,
 }
@@ -127,13 +138,13 @@ export const BOT_RIG: RigConfig = {
   turretYawLimit: Math.PI,
   gunPitchMin: -0.1,
   gunPitchMax: 0.28,
-  maxHp: 140,
+  maxHp: 3,
   moveSpeed: 6.4,
   reverseSpeed: 3.1,
   turnSpeed: 0.95,
   turretTurnSpeed: 1.35,
-  fireCooldown: 1.35,
-  damage: 28,
+  fireCooldown: 1.55,
+  damage: 1,
   projectileSpeed: 78,
   cameraDistance: 14,
 }

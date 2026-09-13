@@ -7,6 +7,7 @@ import {
   TextureLoader,
   Vector3,
   WebGLRenderer,
+  type Object3D,
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Arena } from './Arena'
@@ -15,7 +16,7 @@ import { collidesAny, pointHitsObb } from './collision'
 import {
   ARENA_HALF,
   BOT_RIG,
-  BOT_SPAWN,
+  ENEMY_SPAWNS,
   FOLIAGE_URL,
   GRASS_PATCH_URL,
   HOUSE_URL,
@@ -24,6 +25,7 @@ import {
   PLAYER_SPAWN,
   ROAD_DIFF_URL,
   VILLAGE_PROPS,
+  waveEnemyCount,
 } from './config'
 import { Input } from './input'
 import { Projectile } from './Projectile'
@@ -32,8 +34,12 @@ import { terrainHeight } from './terrain'
 import { TrackMarks } from './TrackMarks'
 import { GameAudio } from './audio'
 import { CombatFx } from './fx'
+import { Bot } from './Bot'
+import { GAME_DAY_SECONDS } from './atmosphere'
 import { releaseIntroMusic } from '../ui/intro'
-import type { Hud } from '../ui/hud'
+import { formatHeldTime, type Hud } from '../ui/hud'
+
+type EnemyUnit = { tank: Tank; ai: Bot }
 
 export class Game {
   private readonly renderer: WebGLRenderer
@@ -47,11 +53,19 @@ export class Game {
   private readonly tracks = new TrackMarks()
   private readonly audio = new GameAudio()
   private readonly fx = new CombatFx()
+  private readonly force: EnemyUnit[] = []
+  private readonly wrecks: Tank[] = []
   private arena!: Arena
   private player!: Tank
-  private botTank!: Tank
+  private botTemplate!: Object3D
   private playing = false
   private roundOver = false
+  private kills = 0
+  private waveIndex = 0
+  private wavesCleared = 0
+  private spawnWait = 0
+  private missionTime = 0
+  private enemySeq = 0
 
   constructor(canvas: HTMLCanvasElement, hud: Hud) {
     this.hud = hud
@@ -106,6 +120,7 @@ export class Game {
       }
       this.arena.addFoliage(foliageGltf.scene, grassGltf.scene)
       this.arena.addPerimeter(perimeterGltf.scene)
+      this.botTemplate = botGltf.scene
       this.player = new Tank(
         'player',
         playerGltf.scene,
@@ -113,19 +128,11 @@ export class Game {
         new Vector3(PLAYER_SPAWN.x, 0, PLAYER_SPAWN.z),
         PLAYER_SPAWN.yaw,
       )
-      this.botTank = new Tank(
-        'bot',
-        botGltf.scene,
-        BOT_RIG,
-        new Vector3(BOT_SPAWN.x, 0, BOT_SPAWN.z),
-        BOT_SPAWN.yaw,
-      )
     } catch (error) {
       throw new Error(`Setup: ${error instanceof Error ? error.message : String(error)}`)
     }
-    this.scene.add(this.player.object, this.botTank.object, this.tracks.mesh, this.fx.sparks, this.fx.smoke)
+    this.scene.add(this.player.object, this.tracks.mesh, this.fx.sparks, this.fx.smoke)
     this.player.sitOnTerrain()
-    this.botTank.sitOnTerrain()
     this.cameraRig.reset(this.player)
     this.hud.readyToPlay()
     this.loop()
@@ -134,6 +141,8 @@ export class Game {
   private beginPlay(): void {
     if (this.roundOver) {
       this.restartRound()
+    } else if (this.force.length === 0) {
+      this.spawnWave()
     }
     this.playing = true
     this.hud.hideOverlay()
@@ -147,17 +156,27 @@ export class Game {
   private restartRound(): void {
     this.roundOver = false
     this.playing = true
+    this.kills = 0
+    this.waveIndex = 0
+    this.wavesCleared = 0
+    this.spawnWait = 0
+    this.missionTime = 0
+    this.enemySeq = 0
+    this.clearEnemies()
     this.player.reset()
-    this.botTank.reset()
     this.tracks.clear()
     this.fx.clear()
     this.audio.stopEngine()
+    this.arena.atmosphere.resetMissionClock()
     this.cameraRig.reset(this.player)
     for (const shot of this.projectiles) {
       shot.object.removeFromParent()
     }
     this.projectiles.length = 0
     this.hud.hideOverlay()
+    this.spawnWave()
+    this.input.arm()
+    this.input.lockPointer()
   }
 
   private loop = (): void => {
@@ -168,13 +187,16 @@ export class Game {
   }
 
   private update(dt: number): void {
-    if (this.input.consumeRestart() && this.player && this.botTank) {
+    if (this.input.consumeRestart() && this.player) {
       this.restartRound()
       this.hud.hideOverlay()
+      this.input.arm()
     }
 
     const mouse = this.input.consumeMouse()
+    const bodies = this.allBodies()
     if (this.playing && !this.roundOver && this.player.alive) {
+      this.missionTime += dt
       this.player.addAimDelta(-mouse.dy * 0.0024)
       this.player.addAimDelta(this.input.elevate() * 1.15 * dt)
       this.player.drive(
@@ -183,7 +205,7 @@ export class Game {
         dt,
         this.arena.obstacles,
         ARENA_HALF,
-        this.botTank,
+        bodies,
       )
       if (this.input.throttle() !== 0 || this.input.steer() !== 0) {
         this.tracks.stamp(this.player)
@@ -195,20 +217,24 @@ export class Game {
         this.cameraRig.getAimPoint(this.aimPoint, this.player)
         this.spawnShot(this.player.tryFireToward(this.aimPoint))
       }
-      this.botTank.applyAimPose()
-    } else if (this.botTank) {
+      for (const unit of this.force) {
+        this.spawnShot(unit.ai.update(dt, this.player, this.arena.obstacles, bodies))
+      }
+      this.advanceWave(dt)
+    } else {
       this.audio.stopEngine()
-      this.botTank.applyAimPose()
       this.player?.applyAimPose()
+      for (const unit of this.force) unit.tank.applyAimPose()
     }
 
     this.player?.tickHitSway(dt)
-    this.botTank?.tickHitSway(dt)
+    for (const unit of this.force) unit.tank.tickHitSway(dt)
+    for (const wreck of this.wrecks) wreck.tickHitSway(dt)
     this.tracks.update(dt)
     this.fx.update(dt)
     this.updateProjectiles(dt)
 
-    if (this.player && this.botTank) {
+    if (this.player) {
       this.cameraRig.update(this.player, dt, this.arena.cameraBlockers)
       this.arena.tick(dt, this.cameraRig.camera, this.player.position)
       this.hud.setAtmosphere(this.arena.atmosphere.label)
@@ -219,8 +245,7 @@ export class Game {
       this.hud.update(
         this.player.hp,
         this.player.config.maxHp,
-        this.botTank.hp,
-        this.botTank.config.maxHp,
+        this.kills,
         this.player.reloadProgress(),
         this.player.gunPitch,
         this.player.config.gunPitchMin,
@@ -247,7 +272,7 @@ export class Game {
         shot.alive = false
       } else {
         this.tryHit(shot, this.player)
-        this.tryHit(shot, this.botTank)
+        for (const unit of this.force) this.tryHit(shot, unit.tank)
       }
       if (!shot.alive) {
         shot.object.removeFromParent()
@@ -258,6 +283,7 @@ export class Game {
 
   private tryHit(shot: Projectile, tank: Tank): void {
     if (!shot.alive || !tank.alive || shot.ownerId === tank.id) return
+    if (shot.ownerId !== 'player' && tank.id !== 'player') return
     const p = shot.object.position
     if (p.y < tank.position.y - 0.2 || p.y > tank.position.y + tank.height + 0.4) return
     if (pointHitsObb(p.x, p.z, tank.position.x, tank.position.z, tank.hullYaw, tank.halfWidth, tank.halfLength)) {
@@ -269,22 +295,76 @@ export class Game {
       if (killed) {
         this.audio.explode()
         this.fx.explode(fxAt)
+        this.fx.igniteWreck(this.scene, tank.position, tank.height)
+        if (tank.id !== 'player') this.onEnemyKilled(tank)
       }
       shot.alive = false
     }
   }
 
+  private onEnemyKilled(tank: Tank): void {
+    this.kills += 1
+    this.wrecks.push(tank)
+    const idx = this.force.findIndex((unit) => unit.tank === tank)
+    if (idx >= 0) this.force.splice(idx, 1)
+    if (this.force.length === 0) {
+      this.wavesCleared += 1
+      this.spawnWait = 2.4
+    }
+  }
+
+  private advanceWave(dt: number): void {
+    if (this.force.length > 0) return
+    this.spawnWait -= dt
+    if (this.spawnWait > 0) return
+    this.spawnWave()
+  }
+
+  private spawnWave(): void {
+    const count = waveEnemyCount(this.waveIndex)
+    this.waveIndex += 1
+    for (let i = 0; i < count; i++) this.spawnEnemy(i)
+  }
+
+  private spawnEnemy(slot: number): void {
+    const pose = ENEMY_SPAWNS[slot % ENEMY_SPAWNS.length]
+    const jitter = (Math.random() - 0.5) * 2.4
+    const tank = new Tank(
+      `enemy-${this.enemySeq}`,
+      this.botTemplate.clone(true),
+      BOT_RIG,
+      new Vector3(pose.x + jitter, 0, pose.z + jitter),
+      pose.yaw,
+    )
+    this.enemySeq += 1
+    tank.sitOnTerrain()
+    this.scene.add(tank.object)
+    this.force.push({ tank, ai: new Bot(tank) })
+  }
+
+  private clearEnemies(): void {
+    for (const unit of this.force) unit.tank.object.removeFromParent()
+    for (const wreck of this.wrecks) wreck.object.removeFromParent()
+    this.force.length = 0
+    this.wrecks.length = 0
+  }
+
+  private allBodies(): Tank[] {
+    const list: Tank[] = [this.player, ...this.wrecks]
+    for (const unit of this.force) list.push(unit.tank)
+    return list
+  }
+
   private checkRound(): void {
     if (this.roundOver || !this.playing) return
-    if (!this.player.alive) {
-      this.roundOver = true
-      this.playing = false
-      this.hud.roundOver(false)
-    } else if (!this.botTank.alive) {
-      this.roundOver = true
-      this.playing = false
-      this.hud.roundOver(true)
-    }
+    if (this.player.alive) return
+    this.roundOver = true
+    this.playing = false
+    this.hud.showDefeat({
+      kills: this.kills,
+      wavesCleared: this.wavesCleared,
+      held: formatHeldTime((this.missionTime * 24) / GAME_DAY_SECONDS),
+    })
   }
 
   private resize(): void {

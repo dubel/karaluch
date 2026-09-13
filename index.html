@@ -15,9 +15,9 @@
             <div class="hp-bar"><div id="hp-player" class="hp-fill player"></div></div>
           </div>
           <div id="atmos" class="atmos">wrzesień</div>
-          <div class="hp-block enemy">
-            <span class="hp-label">Pz.Kpfw. III</span>
-            <div class="hp-bar"><div id="hp-bot" class="hp-fill enemy"></div></div>
+          <div class="hp-block score">
+            <span class="hp-label">Zniszczone</span>
+            <div id="kills" class="kills">0</div>
           </div>
         </div>
         <div id="crosshair" class="crosshair">
@@ -43,14 +43,15 @@
       <div id="overlay" class="overlay">
         <div class="overlay-card">
           <h1>KARALUCH</h1>
-          <p class="tag">TKS vs Pz.Kpfw. III</p>
+          <p id="overlay-tag" class="tag">Osłona odwrotu · Sieraków 1939</p>
           <p id="overlay-status" class="status">Ładowanie modeli… 0%</p>
-          <ul>
+          <ul id="overlay-help">
             <li><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> jazda kadłubem (←/→ — celowanie w bok)</li>
             <li><kbd>Mysz</kbd> <kbd>W</kbd><kbd>S</kbd> elewacja lufy</li>
             <li><kbd>LPM</kbd> <kbd>Spacja</kbd> ogień</li>
-            <li><kbd>R</kbd> restart rundy</li>
+            <li><kbd>R</kbd> restart misji</li>
           </ul>
+          <div id="overlay-stats" class="mission-stats" hidden></div>
           <button id="play-btn" type="button" disabled>Czekaj na modele</button>
         </div>
       </div>

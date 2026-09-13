@@ -2,6 +2,8 @@ import { Mesh, MeshStandardMaterial, SphereGeometry, Vector3 } from 'three'
 
 const geometry = new SphereGeometry(0.12, 10, 8)
 
+export type ShotSide = 'player' | 'enemy'
+
 export class Projectile {
   readonly ownerId: string
   readonly damage: number
@@ -11,19 +13,22 @@ export class Projectile {
   readonly ttl = 2.8
   alive = true
 
-  constructor(ownerId: string, origin: Vector3, direction: Vector3, speed: number, damage: number) {
+  constructor(
+    ownerId: string,
+    origin: Vector3,
+    direction: Vector3,
+    speed: number,
+    damage: number,
+    side: ShotSide,
+  ) {
     this.ownerId = ownerId
     this.damage = damage
     this.velocity = direction.clone().normalize().multiplyScalar(speed)
-    this.object = new Mesh(
-      geometry,
-      new MeshStandardMaterial({
-        color: 0xffe08a,
-        emissive: 0xffc14d,
-        emissiveIntensity: 2.2,
-        roughness: 0.35,
-      }),
-    )
+    const tracer =
+      side === 'enemy'
+        ? { color: 0xff5a3a, emissive: 0xff2208, emissiveIntensity: 2.6 }
+        : { color: 0xffe08a, emissive: 0xffc14d, emissiveIntensity: 2.2 }
+    this.object = new Mesh(geometry, new MeshStandardMaterial({ ...tracer, roughness: 0.35 }))
     this.object.position.copy(origin)
     this.object.castShadow = true
   }

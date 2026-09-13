@@ -35,7 +35,7 @@ export class Bot {
     this.tank.tickCooldown(dt)
 
     if (this.tank.aimError(targetYaw) < 0.12 && distance < 38 && distance > 8) {
-      return this.tank.tryFire()
+      return this.tank.tryFireToward(player.position)
     }
     return null
   }

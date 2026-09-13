@@ -18,7 +18,7 @@ import {
 import type { Aabb } from './collision'
 import { ARENA_HALF, HOUSE_TARGET_LENGTH } from './config'
 import { sowFoliage, type WindClock } from './foliage'
-import { createRoadMesh } from './road'
+import { createRoadMesh, installRoadGrade } from './road'
 import { normalizeModel, stripJunk } from './rig'
 import { displaceTerrain } from './terrain'
 
@@ -53,6 +53,7 @@ export class Arena {
 
     const groundGeo = new PlaneGeometry(ARENA_HALF * 2.18, ARENA_HALF * 2.18, 256, 256)
     groundGeo.rotateX(-Math.PI / 2)
+    installRoadGrade()
     displaceTerrain(groundGeo)
     const ground = new Mesh(groundGeo, makeGrassMaterial())
     ground.receiveShadow = true

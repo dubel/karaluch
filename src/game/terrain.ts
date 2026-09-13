@@ -55,7 +55,7 @@ function moundHeight(x: number, z: number): number {
   return h
 }
 
-export function terrainHeight(x: number, z: number): number {
+export function rawTerrainHeight(x: number, z: number): number {
   const house = 1 - smoothstep(HOUSE_FLAT, HOUSE_BLEND, Math.hypot(x, z))
   const edge = Math.max(Math.abs(x), Math.abs(z))
   const wall = smoothstep(ARENA_HALF - 12, ARENA_HALF, edge)
@@ -66,6 +66,18 @@ export function terrainHeight(x: number, z: number): number {
     Math.sin(x * 0.008 + z * 0.011 + 4.2) * 0.22
   const raw = Math.max(0, n) + moundHeight(x, z)
   return raw * (1 - house * 0.95) * (1 - wall)
+}
+
+type GradeFn = (x: number, z: number, raw: number) => number
+let gradeFn: GradeFn | null = null
+
+export function setTerrainGrade(fn: GradeFn | null): void {
+  gradeFn = fn
+}
+
+export function terrainHeight(x: number, z: number): number {
+  const raw = rawTerrainHeight(x, z)
+  return gradeFn ? gradeFn(x, z, raw) : raw
 }
 
 export function displaceTerrain(geometry: BufferGeometry): void {

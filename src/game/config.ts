@@ -136,7 +136,7 @@ export const PLAYER_RIG: RigConfig = {
   maxHp: 9,
   moveSpeed: 9,
   reverseSpeed: 4.2,
-  turnSpeed: 2.25,
+  turnSpeed: 3.35,
   turretTurnSpeed: 2.4,
   fireCooldown: 0.85 * 0.75,
   damage: 1,

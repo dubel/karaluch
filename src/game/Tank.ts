@@ -359,6 +359,11 @@ export class Tank {
     )
   }
 
+  nudgeYaw(delta: number): void {
+    if (!this.alive || Math.abs(delta) < 1e-6) return
+    this.hullYaw = wrapPi(this.hullYaw + delta)
+  }
+
   aimTowards(worldYaw: number, pitch: number, dt: number): void {
     if (!this.alive) return
     const desired = wrapPi(worldYaw - this.hullYaw)

@@ -236,8 +236,9 @@ export class Game {
     const bodies = this.allBodies()
     if (this.playing && !this.roundOver && this.player.alive) {
       this.missionTime += dt
-      this.player.addAimDelta(-mouse.dy * 0.0024)
-      this.player.addAimDelta(this.input.elevate() * 1.15 * dt)
+      this.player.nudgeYaw(mouse.dx * 0.0038)
+      this.player.addAimDelta(-mouse.dy * 0.0044)
+      this.player.addAimDelta(this.input.elevate() * 2.2 * dt)
       this.player.drive(
         this.input.throttle(),
         this.input.steer(),

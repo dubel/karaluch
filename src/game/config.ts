@@ -103,7 +103,8 @@ export const WORKSHOP_RADIUS = TKS_LENGTH * 2
 export const WORKSHOP_BARRELS_URL = new URL('../../assets/barrels_and_pallet.glb', import.meta.url).href
 export const WORKSHOP_WRENCH_URL = new URL('../../assets/monkey_wrench_low_poly.glb', import.meta.url).href
 export const WORKSHOP_HEAL_RATE = 0.02
-export const ENEMY_ACCURACY = 0.8
+export const KID_MODE = parseFlag(new URLSearchParams(window.location.search).get('kid'))
+export const ENEMY_ACCURACY = KID_MODE ? 0.05 : 0.8
 export const ARTY_SHELLS_PER_TANK = 5
 export const ARTY_HIT_CHANCE = 0.8
 /** SE road past the village — opposite the TKS approach. */
@@ -170,4 +171,10 @@ export const BOT_RIG: RigConfig = {
   projectileSpeed: 78,
   cameraDistance: 14,
   visualYaw: Math.PI / 2,
+}
+
+function parseFlag(value: string | null): boolean {
+  if (!value) return false
+  const n = value.trim().toLowerCase()
+  return n === '1' || n === 'true' || n === 'yes'
 }

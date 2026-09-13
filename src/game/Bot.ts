@@ -1,6 +1,6 @@
 import { Vector3 } from 'three'
 import type { Aabb } from './collision'
-import { ARENA_HALF, ENEMY_ACCURACY } from './config'
+import { ARENA_HALF, ENEMY_ACCURACY, KID_MODE } from './config'
 import type { Tank } from './Tank'
 import type { Projectile } from './Projectile'
 
@@ -118,7 +118,7 @@ export class Bot {
     if (!this.tank.aimedAt(aimX, aimY, aimZ, 0.045)) return null
     const shot = this.tank.tryFireToward(hunt.position)
     if (shot && this.kind === 'axis' && Math.random() > ENEMY_ACCURACY) {
-      shot.scatter(0.1 + Math.random() * 0.09)
+      shot.scatter(KID_MODE ? 0.55 + Math.random() * 0.4 : 0.1 + Math.random() * 0.09)
     }
     return shot
   }

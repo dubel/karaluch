@@ -19,6 +19,7 @@ Doklej query string do adresu gry. Bez `fixed` wartości z URL-a to tylko **punk
 | `mist` | `true` / `false` (albo `1` / `0`) | losowe zapadanie mgły |
 | `fixed` | `true` / `false` | `false` |
 | `pauseday` | `true` / `1` | wyłączone |
+| `kid` | `true` / `false` | `false` — tryb dla dzieci: wrogowie 5% trafień, arta co 2 h |
 
 `fixed=true` **zamraża tylko to, co podasz w URL-u**:
 
@@ -57,3 +58,9 @@ Burza na horyzoncie:
 Lokalnie:
 
 `http://127.0.0.1:5173/karaluch/?hour=8&weather=clear&fixed=true`
+
+Tryb dla dzieci (łatwe trafienia wroga, częsta arta):
+
+```
+?kid=true
+```

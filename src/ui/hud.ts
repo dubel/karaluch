@@ -1,3 +1,5 @@
+import { KID_MODE } from '../game/config'
+
 export type MissionStats = {
   kills: number
   wavesCleared: number
@@ -40,6 +42,13 @@ export class Hud {
     this.arty = this.el('#arty')
     this.artyVeil = this.el('#arty-veil')
     this.rosterCount = this.el('#roster-count')
+    const artyHelp = this.el('#help-arty')
+    if (KID_MODE) {
+      artyHelp.replaceChildren()
+      const key = document.createElement('kbd')
+      key.textContent = 'A'
+      artyHelp.append(key, ' nalot artyleryjski (co 2 godziny czasu gry)')
+    }
   }
 
   onPlay(handler: () => void): void {
@@ -59,7 +68,7 @@ export class Hud {
   }
 
   readyToPlay(): void {
-    this.tag.textContent = 'Osłona odwrotu · Sieraków 1939'
+    this.tag.textContent = KID_MODE ? 'Osłona odwrotu · tryb dla dzieci' : 'Osłona odwrotu · Sieraków 1939'
     this.setStatus('Kliknij, aby celować')
     this.help.hidden = false
     this.stats.hidden = true

@@ -16,6 +16,7 @@ import {
   type PerspectiveCamera,
 } from 'three'
 import type { WindClock } from './foliage'
+import { KID_MODE } from './config'
 
 export const atmosWetness = { value: 0 }
 
@@ -51,6 +52,17 @@ const WEATHER: Record<WeatherId, WeatherSpec> = {
 const IDS = Object.keys(WEATHER) as WeatherId[]
 /** Real seconds that map to one in-game day. */
 export const GAME_DAY_SECONDS = 8 * 60
+/** 2 in-game hours — kid mode only. */
+export const ARTY_KID_COOLDOWN_SECONDS = GAME_DAY_SECONDS / 12
+
+export function artilleryCooldownSeconds(missionTime: number): number {
+  if (KID_MODE) return ARTY_KID_COOLDOWN_SECONDS
+  const day = Math.floor(Math.max(0, missionTime) / GAME_DAY_SECONDS)
+  if (day <= 0) return GAME_DAY_SECONDS / 3
+  if (day === 1) return GAME_DAY_SECONDS / 2
+  if (day === 2) return GAME_DAY_SECONDS
+  return GAME_DAY_SECONDS * 2
+}
 const DAY_LENGTH_SEC = GAME_DAY_SECONDS
 const LAT = (50.1 * Math.PI) / 180
 const SUN_DEC = (3.4 * Math.PI) / 180

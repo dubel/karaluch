@@ -41,7 +41,7 @@ import { CombatFx, MAX_WRECKS } from './fx'
 import { Bot } from './Bot'
 import { ArtilleryBarrage } from './artillery'
 import { Workshop } from './workshop'
-import { GAME_DAY_SECONDS } from './atmosphere'
+import { GAME_DAY_SECONDS, artilleryCooldownSeconds } from './atmosphere'
 import { releaseIntroMusic } from '../ui/intro'
 import { formatHeldTime, type Hud } from '../ui/hud'
 
@@ -77,6 +77,7 @@ export class Game {
   private enemySeq = 0
   private allySeq = 0
   private artilleryWait = 0
+  private artilleryWaitMax = 1
   private readonly barrage = new ArtilleryBarrage()
 
   constructor(canvas: HTMLCanvasElement, hud: Hud) {
@@ -200,6 +201,7 @@ export class Game {
     this.enemySeq = 0
     this.allySeq = 0
     this.artilleryWait = 0
+    this.artilleryWaitMax = 1
     this.barrage.clear()
     this.clearEnemies()
     this.player.reset()
@@ -248,9 +250,10 @@ export class Game {
         bodies,
       )
       if (this.input.throttle() !== 0 || this.input.steer() !== 0) {
-        this.tracks.stamp(this.player)
+        this.audio.setMotion(Math.max(Math.abs(this.input.throttle()), Math.abs(this.input.steer()) * 0.55))
+      } else {
+        this.audio.setMotion(0)
       }
-      this.audio.setMotion(Math.max(Math.abs(this.input.throttle()), Math.abs(this.input.steer()) * 0.55))
       this.player.applyAimPose()
       this.player.tickCooldown(dt)
       if (this.input.consumeArtillery()) this.callArtillery()
@@ -278,6 +281,9 @@ export class Game {
         this.spawnShot(unit.ai.update(dt, hunt, this.arena.obstacles, bodies))
       }
       this.advanceWave(dt)
+      this.tracks.stamp(this.player)
+      for (const unit of this.force) this.tracks.stamp(unit.tank)
+      for (const unit of this.allies) this.tracks.stamp(unit.tank)
     } else {
       this.audio.stopEngine()
       this.player?.applyAimPose()
@@ -328,7 +334,7 @@ export class Game {
 
   private artilleryCharge(): number {
     if (this.artilleryWait <= 0) return 1
-    return Math.max(0, 1 - this.artilleryWait / GAME_DAY_SECONDS)
+    return Math.max(0, 1 - this.artilleryWait / this.artilleryWaitMax)
   }
 
   private callArtillery(): void {
@@ -338,7 +344,9 @@ export class Game {
       this.hud.flash('Brak celów dla nalotu')
       return
     }
-    this.artilleryWait = GAME_DAY_SECONDS
+    const wait = artilleryCooldownSeconds(this.missionTime)
+    this.artilleryWait = wait
+    this.artilleryWaitMax = wait
     this.barrage.start(targets, this.scene)
     this.audio.incomingBarrage()
     this.hud.flash('Nalot artyleryjski!')

@@ -312,6 +312,7 @@ export class Game {
         this.player.config.gunPitchMax,
         this.workshop.contains(this.player.position.x, this.player.position.z),
         this.artilleryCharge(),
+        (this.player.alive ? 1 : 0) + this.allies.filter((unit) => unit.tank.alive).length,
       )
       this.checkRound()
     }

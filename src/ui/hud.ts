@@ -20,6 +20,7 @@ export class Hud {
   private readonly gunLabel: HTMLElement
   private readonly arty: HTMLElement
   private readonly artyVeil: HTMLElement
+  private readonly rosterCount: HTMLElement
   private noticeHandle = 0
 
   constructor() {
@@ -38,6 +39,7 @@ export class Hud {
     this.gunLabel = this.el('#gun-label')
     this.arty = this.el('#arty')
     this.artyVeil = this.el('#arty-veil')
+    this.rosterCount = this.el('#roster-count')
   }
 
   onPlay(handler: () => void): void {
@@ -93,6 +95,7 @@ export class Hud {
     pitchMax: number,
     repairing = false,
     artyCharge = 1,
+    tksInField = 1,
   ): void {
     this.hpPlayer.style.width = `${(playerHp / playerMax) * 100}%`
     this.hpPlayer.classList.toggle('repairing', repairing)
@@ -104,6 +107,7 @@ export class Hud {
     this.pitchPip.style.transform = `translate(-50%, calc(-50% + ${y}px))`
     this.arty.classList.toggle('ready', artyCharge >= 1)
     this.artyVeil.style.transform = `scaleY(${1 - Math.max(0, Math.min(1, artyCharge))})`
+    this.rosterCount.textContent = String(tksInField)
   }
 
   flash(text: string): void {

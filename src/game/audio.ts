@@ -11,6 +11,8 @@ export class GameAudio {
   private readonly raw = new Map<string, ArrayBuffer>()
   private readonly decoded = new Map<string, AudioBuffer>()
   private engineVol = 0
+  private rainGain: GainNode | null = null
+  private windGain: GainNode | null = null
   private ready = false
 
   async load(): Promise<void> {
@@ -43,6 +45,7 @@ export class GameAudio {
       this.decoded.set(name, await ctx.decodeAudioData(buf.slice(0)))
     }
     this.startEngine()
+    this.startWeatherPads()
     this.ready = true
     await ctx.resume()
   }
@@ -74,6 +77,13 @@ export class GameAudio {
     this.setMotion(0)
   }
 
+  setWeather(rain: number, wind: number): void {
+    if (!this.ctx || !this.rainGain || !this.windGain) return
+    const t = this.ctx.currentTime
+    this.rainGain.gain.setTargetAtTime(Math.max(0, rain) * 0.2, t, 0.35)
+    this.windGain.gain.setTargetAtTime(Math.max(0, wind) * 0.07, t, 0.4)
+  }
+
   private startEngine(): void {
     const ctx = this.ctx
     const buf = this.decoded.get('engine')
@@ -95,6 +105,13 @@ export class GameAudio {
     this.engineFilter = filter
   }
 
+  private startWeatherPads(): void {
+    const ctx = this.ctx
+    if (!ctx || !this.master) return
+    this.rainGain = loopPad(ctx, this.master, makeRainBuffer(ctx), 0, 1.04)
+    this.windGain = loopPad(ctx, this.master, makeWindBuffer(ctx), 0, 0.92)
+  }
+
   private play(name: string, volume: number, rate: number): void {
     const ctx = this.ctx
     const buf = this.decoded.get(name)
@@ -108,6 +125,59 @@ export class GameAudio {
     gain.connect(this.master)
     src.start()
   }
+}
+
+function loopPad(
+  ctx: AudioContext,
+  dest: GainNode,
+  buf: AudioBuffer,
+  volume: number,
+  rate: number,
+): GainNode {
+  const src = ctx.createBufferSource()
+  src.buffer = buf
+  src.loop = true
+  src.playbackRate.value = rate
+  const filter = ctx.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.frequency.value = rate > 1 ? 4200 : 760
+  const gain = ctx.createGain()
+  gain.gain.value = volume
+  src.connect(filter)
+  filter.connect(gain)
+  gain.connect(dest)
+  src.start()
+  return gain
+}
+
+function makeRainBuffer(ctx: AudioContext): AudioBuffer {
+  const sr = ctx.sampleRate
+  const n = sr * 2
+  const buf = ctx.createBuffer(1, n, sr)
+  const data = buf.getChannelData(0)
+  for (let i = 0; i < n; i++) {
+    const hiss = Math.random() * 2 - 1
+    const drip = Math.random() < 0.012 ? (Math.random() * 2 - 1) * 0.9 : 0
+    data[i] = hiss * 0.22 + drip
+  }
+  return buf
+}
+
+function makeWindBuffer(ctx: AudioContext): AudioBuffer {
+  const sr = ctx.sampleRate
+  const n = sr * 3
+  const buf = ctx.createBuffer(1, n, sr)
+  const data = buf.getChannelData(0)
+  let brown = 0
+  for (let i = 0; i < n; i++) {
+    brown = clampAudio(brown + (Math.random() * 2 - 1) * 0.02, -0.4, 0.4)
+    data[i] = brown
+  }
+  return buf
+}
+
+function clampAudio(n: number, a: number, b: number): number {
+  return Math.min(b, Math.max(a, n))
 }
 
 function makeHitBuffer(ctx: AudioContext): AudioBuffer {

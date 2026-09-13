@@ -187,7 +187,6 @@ export class Game {
       this.player?.applyAimPose()
     }
 
-    this.arena?.tick(dt)
     this.player?.tickHitSway(dt)
     this.botTank?.tickHitSway(dt)
     this.tracks.update(dt)
@@ -196,6 +195,9 @@ export class Game {
 
     if (this.player && this.botTank) {
       this.cameraRig.update(this.player, dt, this.arena.cameraBlockers)
+      this.arena.tick(dt, this.cameraRig.camera, this.player.position)
+      this.hud.setAtmosphere(this.arena.atmosphere.label)
+      this.audio.setWeather(this.arena.atmosphere.rain, this.arena.atmosphere.wind)
       this.hud.update(
         this.player.hp,
         this.player.config.maxHp,

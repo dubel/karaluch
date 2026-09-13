@@ -6,6 +6,7 @@ export class Hud {
   private readonly hpBot: HTMLElement
   private readonly reload: HTMLElement
   private readonly pitchPip: HTMLElement
+  private readonly atmos: HTMLElement
 
   constructor() {
     this.overlay = this.el('#overlay')
@@ -15,6 +16,7 @@ export class Hud {
     this.hpBot = this.el('#hp-bot')
     this.reload = this.el('#reload-fill')
     this.pitchPip = this.el('#pitch-pip')
+    this.atmos = this.el('#atmos')
   }
 
   onPlay(handler: () => void): void {
@@ -47,6 +49,10 @@ export class Hud {
 
   hideOverlay(): void {
     this.overlay.classList.add('hidden')
+  }
+
+  setAtmosphere(text: string): void {
+    this.atmos.textContent = text
   }
 
   update(

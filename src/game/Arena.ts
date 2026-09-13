@@ -2,10 +2,6 @@ import {
   Box3,
   BoxGeometry,
   CanvasTexture,
-  Color,
-  DirectionalLight,
-  Fog,
-  HemisphereLight,
   Mesh,
   MeshStandardMaterial,
   PlaneGeometry,
@@ -13,7 +9,9 @@ import {
   SRGBColorSpace,
   Scene,
   type Object3D,
+  type PerspectiveCamera,
   type Texture,
+  type Vector3,
 } from 'three'
 import type { Aabb } from './collision'
 import { ARENA_HALF, HOUSE_TARGET_LENGTH } from './config'
@@ -21,41 +19,33 @@ import { sowFoliage, type WindClock } from './foliage'
 import { createRoadMesh, installRoadGrade } from './road'
 import { normalizeModel, stripJunk } from './rig'
 import { displaceTerrain } from './terrain'
+import { Atmosphere, atmosWetness } from './atmosphere'
 
 export { ARENA_HALF } from './config'
 
 export class Arena {
   readonly obstacles: Aabb[] = []
   readonly cameraBlockers: Aabb[] = []
-  readonly wind: WindClock = { value: 0 }
+  readonly wind: WindClock = {
+    value: 0,
+    strength: { value: 0.5 },
+    dirX: { value: 0.85 },
+    dirZ: { value: 0.35 },
+  }
+  readonly atmosphere: Atmosphere
   private readonly scene: Scene
+  private readonly groundMat: MeshStandardMaterial
 
   constructor(scene: Scene) {
     this.scene = scene
-    scene.background = new Color(0x6b7c8a)
-    scene.fog = new Fog(0x6b7c8a, 140, 520)
-
-    const hemi = new HemisphereLight(0xc5d4e0, 0x4a4030, 0.85)
-    scene.add(hemi)
-
-    const sun = new DirectionalLight(0xffe2b8, 1.45)
-    sun.position.set(90, 140, 60)
-    sun.castShadow = true
-    sun.shadow.mapSize.set(2048, 2048)
-    sun.shadow.camera.near = 8
-    sun.shadow.camera.far = 420
-    sun.shadow.camera.left = -160
-    sun.shadow.camera.right = 160
-    sun.shadow.camera.top = 160
-    sun.shadow.camera.bottom = -160
-    sun.shadow.bias = -0.0004
-    scene.add(sun)
+    this.atmosphere = new Atmosphere(scene, this.wind)
 
     const groundGeo = new PlaneGeometry(ARENA_HALF * 2.18, ARENA_HALF * 2.18, 256, 256)
     groundGeo.rotateX(-Math.PI / 2)
     installRoadGrade()
     displaceTerrain(groundGeo)
-    const ground = new Mesh(groundGeo, makeGrassMaterial())
+    this.groundMat = makeGrassMaterial()
+    const ground = new Mesh(groundGeo, this.groundMat)
     ground.receiveShadow = true
     scene.add(ground)
 
@@ -86,8 +76,10 @@ export class Arena {
     }
   }
 
-  tick(dt: number): void {
-    this.wind.value += dt
+  tick(dt: number, camera: PerspectiveCamera, follow: Vector3): void {
+    this.atmosphere.tick(dt, camera, follow)
+    this.groundMat.roughness = 0.94 - this.atmosphere.wetness * 0.28
+    this.groundMat.metalness = 0.02 + this.atmosphere.wetness * 0.08
   }
 
   addRoad(map: Texture): void {
@@ -141,12 +133,14 @@ function makeGrassMaterial(): MeshStandardMaterial {
   })
   material.customProgramCacheKey = () => 'arena-grass-field'
   material.onBeforeCompile = (shader) => {
+    shader.uniforms.uWetness = atmosWetness
     shader.vertexShader = `varying vec3 vWorldPos;\n${shader.vertexShader}`.replace(
       'vViewPosition = - mvPosition.xyz;',
       `vViewPosition = - mvPosition.xyz;
 	vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
     )
     shader.fragmentShader = `varying vec3 vWorldPos;
+uniform float uWetness;
 float hash12(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
 	p3 += dot(p3, p3.yzx + 33.33);
@@ -187,7 +181,8 @@ ${shader.fragmentShader}`.replace(
 	diffuseColor.rgb = mix(diffuseColor.rgb, dry, smoothstep(0.48, 0.78, n2) * 0.7);
 	diffuseColor.rgb = mix(diffuseColor.rgb, dirt, smoothstep(0.58, 0.86, n3) * 0.65);
 	float yard = 1.0 - smoothstep(6.0, 15.0, length(wp) + (n2 - 0.5) * 5.0);
-	diffuseColor.rgb = mix(diffuseColor.rgb, mud, yard * 0.62);`,
+	diffuseColor.rgb = mix(diffuseColor.rgb, mud, yard * 0.62);
+	diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.46, 0.5, 0.52), uWetness * 0.78);`,
     )
   }
   return material

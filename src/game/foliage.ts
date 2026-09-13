@@ -18,7 +18,12 @@ import { roadDistance } from './road'
 import { stripJunk } from './rig'
 import { terrainHeight } from './terrain'
 
-export type WindClock = { value: number }
+export type WindClock = {
+  value: number
+  strength: { value: number }
+  dirX: { value: number }
+  dirZ: { value: number }
+}
 
 type ProtoPart = {
   geometry: BufferGeometry
@@ -74,7 +79,7 @@ export function sowFoliage(
   grassPack.updateMatrixWorld(true)
 
   const trees = TREE_NAMES.map((name) =>
-    bakeProto(mustFind(foliagePack, name), name, { targetHeight: TREE_HEIGHT, wind: 0 }),
+    bakeProto(mustFind(foliagePack, name), name, { targetHeight: TREE_HEIGHT, wind: 0.018 }),
   )
   const tuft = bakeProto(mustFind(foliagePack, 'grass-bushes-01'), 'grass-bushes-01', {
     targetHeight: 0.85,
@@ -97,7 +102,7 @@ export function sowFoliage(
   )
   const circle = bakeProto(grassPack, 'grass-circle', { targetHeight: 0.78, maxTris: 2400, wind: 0.08 })
 
-  attachWind(wind, tuft, bush, plantGreen, plantBrown, circle, ...flowers)
+  attachWind(wind, tuft, bush, plantGreen, plantBrown, circle, ...flowers, ...trees)
 
   const rng = mulberry32(0x6b1a7c)
   const treeSpots = thinMinDist(
@@ -206,12 +211,22 @@ function attachWind(wind: WindClock, ...protos: Proto[]): void {
       mat.customProgramCacheKey = () => `foliage-wind-${amount}`
       mat.onBeforeCompile = (shader) => {
         shader.uniforms.uWindTime = wind
-        shader.vertexShader = `uniform float uWindTime;\n${shader.vertexShader}`.replace(
+        shader.uniforms.uWindStrength = wind.strength
+        shader.uniforms.uWindDirX = wind.dirX
+        shader.uniforms.uWindDirZ = wind.dirZ
+        shader.vertexShader = `uniform float uWindTime;
+uniform float uWindStrength;
+uniform float uWindDirX;
+uniform float uWindDirZ;
+${shader.vertexShader}`.replace(
           '#include <begin_vertex>',
           `#include <begin_vertex>
 	float wLift = max(transformed.y, 0.0);
-	transformed.x += sin(uWindTime * 1.15 + transformed.z * 0.55 + transformed.y * 2.1) * wLift * ${amount.toFixed(3)};
-	transformed.z += cos(uWindTime * 0.9 + transformed.x * 0.45) * wLift * ${(amount * 0.65).toFixed(3)};`,
+	float amp = wLift * uWindStrength * ${amount.toFixed(3)};
+	float gust = sin(uWindTime * 1.15 + transformed.z * 0.55 + transformed.y * 2.1);
+	float flutter = cos(uWindTime * 2.35 + transformed.x * 1.25);
+	transformed.x += (uWindDirX * gust + -uWindDirZ * flutter * 0.35) * amp;
+	transformed.z += (uWindDirZ * gust * 0.85 + uWindDirX * flutter * 0.28) * amp;`,
         )
       }
     }

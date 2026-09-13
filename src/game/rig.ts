@@ -1,6 +1,7 @@
 import {
   Box3,
   Group,
+  Matrix4,
   Object3D,
   Vector3,
   type Camera,
@@ -10,8 +11,6 @@ import type { RigConfig } from './config'
 
 const _size = new Vector3()
 const _center = new Vector3()
-const _muzzle = new Vector3()
-const _origin = new Vector3()
 
 function isLight(obj: Object3D): obj is Light {
   return (obj as Light).isLight === true
@@ -86,6 +85,10 @@ export type TankRig = {
 
 export function applyRig(model: Object3D, config: RigConfig): TankRig {
   stripJunk(model)
+  if (config.visualYaw) {
+    model.rotation.y += config.visualYaw
+    model.updateMatrixWorld(true)
+  }
   normalizeModel(model, config.targetLength)
 
   const root = new Group()
@@ -123,43 +126,35 @@ export function applyRig(model: Object3D, config: RigConfig): TankRig {
     gun.attach(part)
   }
 
-  turret.updateMatrixWorld(true)
+  gun.updateMatrixWorld(true)
   const gunBox = bboxOf(gunParts) ?? bboxOf(turretParts)
   if (gunBox) {
-    gunBox.getCenter(_muzzle)
-    const size = gunBox.getSize(_size)
-    const radius = Math.max(size.x, size.z) * 0.5
-    _origin.copy(turret.position)
-    _muzzle.sub(_origin)
-    _muzzle.y = 0
-    if (_muzzle.lengthSq() < 1e-6) {
-      _muzzle.set(0, 0, 1)
-    }
-    _muzzle.setLength(radius + 0.35)
-    muzzle.position.copy(_muzzle)
-    muzzle.position.y = 0
+    const local = gunBox.clone()
+    local.applyMatrix4(new Matrix4().copy(gun.matrixWorld).invert())
+    const zFwd = Math.abs(local.max.z) >= Math.abs(local.min.z) ? local.max.z : local.min.z
+    muzzle.position.set(0, 0, zFwd + Math.sign(zFwd || 1) * 0.4)
   } else {
     muzzle.position.set(0, 0, 1.4)
   }
   gun.add(muzzle)
 
-  visual.updateMatrixWorld(true)
-  let yaw = config.visualYaw ?? 0
   if (config.visualYaw === undefined) {
+    visual.updateMatrixWorld(true)
     const axisBox = bboxOf(gunParts) ?? bboxOf(turretParts)
     if (axisBox) {
       axisBox.getSize(_size)
       axisBox.getCenter(_center)
+      let yaw = 0
       if (_size.x > _size.z * 1.15) {
         yaw = _center.x >= 0 ? -Math.PI / 2 : Math.PI / 2
       } else if (_center.z < 0) {
         yaw = Math.PI
       }
+      if (Math.abs(yaw) > 1e-4) {
+        visual.rotation.y -= yaw
+        visual.updateMatrixWorld(true)
+      }
     }
-  }
-  if (Math.abs(yaw) > 1e-4) {
-    visual.rotation.y -= yaw
-    visual.updateMatrixWorld(true)
   }
 
   const aligned = new Box3().setFromObject(visual)

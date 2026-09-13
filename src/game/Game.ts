@@ -328,12 +328,12 @@ export class Game {
   private spawnWave(): void {
     const count = waveEnemyCount(this.waveIndex)
     this.waveIndex += 1
-    for (let i = 0; i < count; i++) this.spawnEnemy(i)
+    for (let i = 0; i < count; i++) this.spawnEnemy(i, count)
   }
 
-  private spawnEnemy(slot: number): void {
+  private spawnEnemy(slot: number, waveSize: number): void {
     const pose = ENEMY_SPAWNS[slot % ENEMY_SPAWNS.length]
-    const jitter = (Math.random() - 0.5) * 2.4
+    const jitter = (Math.random() - 0.5) * 6.5 + slot * 3.2
     const tank = new Tank(
       `enemy-${this.enemySeq}`,
       this.botTemplate.clone(true),
@@ -344,7 +344,7 @@ export class Game {
     this.enemySeq += 1
     tank.sitOnTerrain()
     this.scene.add(tank.object)
-    this.force.push({ tank, ai: new Bot(tank) })
+    this.force.push({ tank, ai: new Bot(tank, slot, waveSize) })
   }
 
   private clearEnemies(): void {

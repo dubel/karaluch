@@ -138,7 +138,7 @@ export const BOT_RIG: RigConfig = {
   ],
   gunNames: ['Cube.002', 'Cube.005'],
   turretYawLimit: Math.PI,
-  gunPitchMin: -0.1,
+  gunPitchMin: -0.34,
   gunPitchMax: 0.28,
   maxHp: 3,
   moveSpeed: 6.4,
@@ -149,5 +149,5 @@ export const BOT_RIG: RigConfig = {
   damage: 1,
   projectileSpeed: 78,
   cameraDistance: 14,
-  visualYaw: -Math.PI / 2,
+  visualYaw: Math.PI / 2,
 }

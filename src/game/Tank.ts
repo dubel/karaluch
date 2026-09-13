@@ -234,14 +234,74 @@ export class Tank {
         )
         if (tryPos(this.object.position.x, onlyZ.z, yaw)) {
           this.object.position.z = onlyZ.z
+        } else {
+          const rightX = Math.cos(yaw)
+          const rightZ = -Math.sin(yaw)
+          const side = steer === 0 ? (Math.random() < 0.5 ? 1 : -1) : Math.sign(steer)
+          const slip = this.config.moveSpeed * dt * 0.85
+          const sidePos = clampToBounds(
+            this.object.position.x + rightX * side * slip,
+            this.object.position.z + rightZ * side * slip,
+            this.halfWidth,
+            this.halfLength,
+            halfArena,
+          )
+          if (tryPos(sidePos.x, sidePos.z, yaw)) {
+            this.object.position.x = sidePos.x
+            this.object.position.z = sidePos.z
+          }
         }
       }
     }
 
     this.hullYaw = yaw
+    this.unstickFromTanks(others, obstacles, halfArena)
     this.vx = dt > 1e-5 ? (this.object.position.x - prevX) / dt : 0
     this.vz = dt > 1e-5 ? (this.object.position.z - prevZ) / dt : 0
     this.sitOnTerrain()
+  }
+
+  private unstickFromTanks(others: Tank[], obstacles: Aabb[], halfArena: number): void {
+    for (let n = 0; n < 4; n++) {
+      let pushed = false
+      for (const other of others) {
+        if (other === this || !other.alive) continue
+        if (
+          !obbHitsObb(
+            this.object.position.x,
+            this.object.position.z,
+            this.hullYaw,
+            this.halfWidth,
+            this.halfLength,
+            other.object.position.x,
+            other.object.position.z,
+            other.hullYaw,
+            other.halfWidth,
+            other.halfLength,
+          )
+        ) {
+          continue
+        }
+        let dx = this.object.position.x - other.object.position.x
+        let dz = this.object.position.z - other.object.position.z
+        let d = Math.hypot(dx, dz)
+        if (d < 0.05) {
+          dx = Math.cos(this.hullYaw)
+          dz = -Math.sin(this.hullYaw)
+          d = 1
+        }
+        const nx = this.object.position.x + (dx / d) * 0.55
+        const nz = this.object.position.z + (dz / d) * 0.55
+        const bounded = clampToBounds(nx, nz, this.halfWidth, this.halfLength, halfArena)
+        if (collidesAny(bounded.x, bounded.z, this.hullYaw, this.halfWidth, this.halfLength, obstacles)) {
+          continue
+        }
+        this.object.position.x = bounded.x
+        this.object.position.z = bounded.z
+        pushed = true
+      }
+      if (!pushed) break
+    }
   }
 
   sitOnTerrain(): void {
@@ -328,6 +388,9 @@ export class Tank {
     this.muzzle.getWorldPosition(origin)
     this.gun.getWorldPosition(direction)
     direction.subVectors(origin, direction)
+    if (direction.lengthSq() < 1e-6) {
+      this.gun.getWorldDirection(direction)
+    }
     if (direction.lengthSq() < 1e-6) {
       const yaw = this.aimWorldYaw()
       direction.set(Math.sin(yaw), Math.sin(this.gunPitch), Math.cos(yaw))

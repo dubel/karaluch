@@ -271,6 +271,11 @@ body.intro-open .overlay {
   overflow: hidden;
   background: #120c08;
   color: #ead9b8;
+  touch-action: manipulation;
+}
+
+#intro audio {
+  display: none;
 }
 
 #intro-bg,

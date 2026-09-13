@@ -30,6 +30,7 @@ import { terrainHeight } from './terrain'
 import { TrackMarks } from './TrackMarks'
 import { GameAudio } from './audio'
 import { CombatFx } from './fx'
+import { releaseIntroMusic } from '../ui/intro'
 import type { Hud } from '../ui/hud'
 
 export class Game {
@@ -126,6 +127,7 @@ export class Game {
     this.playing = true
     this.hud.hideOverlay()
     this.input.lockPointer()
+    releaseIntroMusic()
     this.audio.prime()
     void this.audio.unlock()
   }

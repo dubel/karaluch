@@ -46,9 +46,41 @@ function marchUrl(): string {
   return probe.canPlayType('audio/ogg; codecs="vorbis"') === 'probably' ? MARCH_OGG : MARCH_AAC
 }
 
+let introMusic: HTMLAudioElement | null = null
+
 export function playIntro(): Promise<void> {
   const intro = new Intro()
   return intro.play()
+}
+
+/** Pause the crawl march. Safe to call more than once; iOS often ignores pause() outside a gesture. */
+export function stopIntroMusic(): void {
+  const music = introMusic
+  if (!music) return
+  music.loop = false
+  music.muted = true
+  music.volume = 0
+  try {
+    music.pause()
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Tear down the HTML audio element inside a user gesture so iOS releases the media session. */
+export function releaseIntroMusic(): void {
+  stopIntroMusic()
+  const music = introMusic
+  introMusic = null
+  if (!music) return
+  try {
+    music.removeAttribute('src')
+    music.src = ''
+    music.load()
+  } catch {
+    /* ignore */
+  }
+  music.remove()
 }
 
 class Intro {
@@ -69,6 +101,7 @@ class Intro {
   private raf = 0
   private finished = false
   private tapped = false
+  private sawTouch = false
   private resolve: () => void = () => undefined
 
   constructor() {
@@ -118,6 +151,10 @@ class Intro {
     this.music.volume = 0.44
     this.music.preload = 'auto'
     this.music.setAttribute('playsinline', '')
+    this.music.setAttribute('webkit-playsinline', '')
+    this.music.style.display = 'none'
+    document.body.append(this.music)
+    introMusic = this.music
   }
 
   play(): Promise<void> {
@@ -200,7 +237,10 @@ class Intro {
     this.finish()
   }
 
-  private onPointer = (): void => {
+  private onPointer = (event: PointerEvent): void => {
+    // iOS emits a compatibility mouse pointerup after the real touch.
+    if (event.pointerType === 'mouse' && this.sawTouch) return
+    if (event.pointerType === 'touch' || event.pointerType === 'pen') this.sawTouch = true
     void this.music.play().catch(() => undefined)
     if (!this.tapped) {
       this.tapped = true
@@ -225,13 +265,7 @@ class Intro {
     window.removeEventListener('resize', this.resize)
     window.removeEventListener('keydown', this.onKey)
     this.root.removeEventListener('pointerup', this.onPointer)
-    const fade = setInterval(() => {
-      this.music.volume = Math.max(0, this.music.volume - 0.08)
-      if (this.music.volume <= 0.01) {
-        clearInterval(fade)
-        this.music.pause()
-      }
-    }, 40)
+    stopIntroMusic()
     this.root.classList.add('intro-out')
     this.bg.dispose()
     this.fg.dispose()

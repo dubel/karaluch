@@ -123,6 +123,7 @@ export class GameAudio {
     if (!ctx) return
     await ctx.resume()
     if (!this.decoded.has('hit')) this.decoded.set('hit', makeHitBuffer(ctx))
+    if (!this.decoded.has('whistle')) this.decoded.set('whistle', makeWhistleBuffer(ctx))
     await Promise.all(
       [...this.raw].map(async ([name, buf]) => {
         if (this.decoded.has(name)) return
@@ -160,6 +161,19 @@ export class GameAudio {
 
   explode(): void {
     this.play('explode', 0.85, 0.92 + Math.random() * 0.1)
+  }
+
+  incomingBarrage(): void {
+    if (this.ctx && !this.decoded.has('whistle')) this.decoded.set('whistle', makeWhistleBuffer(this.ctx))
+    this.play('whistle', 0.58, 0.92, 0)
+    this.play('whistle', 0.5, 1.08, 0.2)
+    this.play('whistle', 0.46, 0.84, 0.42)
+    this.play('whistle', 0.4, 1.14, 0.68)
+    this.play('whistle', 0.34, 0.9, 0.95)
+  }
+
+  artilleryBurst(): void {
+    this.play('explode', 0.62, 0.78 + Math.random() * 0.18)
   }
 
   stopEngine(): void {
@@ -216,7 +230,7 @@ export class GameAudio {
     this.windGain = loopPad(ctx, this.master, makeWindBuffer(ctx), 0, 0.92, 760)
   }
 
-  private play(name: string, volume: number, rate: number): void {
+  private play(name: string, volume: number, rate: number, delay = 0): void {
     const ctx = this.ctx
     const buf = this.decoded.get(name)
     if (!ctx || !this.master || !buf) return
@@ -228,7 +242,7 @@ export class GameAudio {
     gain.gain.value = volume
     src.connect(gain)
     gain.connect(this.master)
-    src.start()
+    src.start(ctx.currentTime + delay)
   }
 }
 
@@ -284,6 +298,24 @@ function makeWindBuffer(ctx: AudioContext): AudioBuffer {
 
 function clampAudio(n: number, a: number, b: number): number {
   return Math.min(b, Math.max(a, n))
+}
+
+function makeWhistleBuffer(ctx: AudioContext): AudioBuffer {
+  const sr = ctx.sampleRate
+  const dur = 1.42
+  const n = Math.floor(sr * dur)
+  const buf = ctx.createBuffer(1, n, sr)
+  const data = buf.getChannelData(0)
+  let phase = 0
+  for (let i = 0; i < n; i++) {
+    const u = i / n
+    const freq = 1720 * (1 - u) ** 0.72 + 240
+    phase += (2 * Math.PI * freq) / sr
+    const env = Math.min(1, i / (sr * 0.08)) * (1 - u) ** 0.42
+    const hiss = (Math.random() * 2 - 1) * 0.1
+    data[i] = (Math.sin(phase) * 0.72 + hiss) * env
+  }
+  return buf
 }
 
 function makeHitBuffer(ctx: AudioContext): AudioBuffer {

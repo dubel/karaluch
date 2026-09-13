@@ -39,6 +39,7 @@ import { TrackMarks } from './TrackMarks'
 import { GameAudio } from './audio'
 import { CombatFx, MAX_WRECKS } from './fx'
 import { Bot } from './Bot'
+import { ArtilleryBarrage } from './artillery'
 import { Workshop } from './workshop'
 import { GAME_DAY_SECONDS } from './atmosphere'
 import { releaseIntroMusic } from '../ui/intro'
@@ -75,6 +76,8 @@ export class Game {
   private missionTime = 0
   private enemySeq = 0
   private allySeq = 0
+  private artilleryWait = 0
+  private readonly barrage = new ArtilleryBarrage()
 
   constructor(canvas: HTMLCanvasElement, hud: Hud) {
     this.hud = hud
@@ -196,6 +199,8 @@ export class Game {
     this.missionTime = 0
     this.enemySeq = 0
     this.allySeq = 0
+    this.artilleryWait = 0
+    this.barrage.clear()
     this.clearEnemies()
     this.player.reset()
     this.tracks.clear()
@@ -247,6 +252,7 @@ export class Game {
       this.audio.setMotion(Math.max(Math.abs(this.input.throttle()), Math.abs(this.input.steer()) * 0.55))
       this.player.applyAimPose()
       this.player.tickCooldown(dt)
+      if (this.input.consumeArtillery()) this.callArtillery()
       const repairing = this.workshop.contains(this.player.position.x, this.player.position.z)
       if (repairing) {
         this.player.heal(this.player.config.maxHp * WORKSHOP_HEAL_RATE * dt)
@@ -282,6 +288,7 @@ export class Game {
     for (const unit of this.force) unit.tank.tickHitSway(dt)
     for (const unit of this.allies) unit.tank.tickHitSway(dt)
     this.workshop?.tick(dt)
+    this.tickArtillery(dt)
     this.tracks.update(dt)
     this.fx.update(dt)
     this.updateProjectiles(dt)
@@ -303,6 +310,7 @@ export class Game {
         this.player.config.gunPitchMin,
         this.player.config.gunPitchMax,
         this.workshop.contains(this.player.position.x, this.player.position.z),
+        this.artilleryCharge(),
       )
       this.checkRound()
     }
@@ -314,6 +322,43 @@ export class Game {
     this.scene.add(shot.object)
     this.audio.fire()
     this.fx.muzzle(shot.object.position)
+  }
+
+  private artilleryCharge(): number {
+    if (this.artilleryWait <= 0) return 1
+    return Math.max(0, 1 - this.artilleryWait / GAME_DAY_SECONDS)
+  }
+
+  private callArtillery(): void {
+    if (this.artilleryWait > 0) return
+    const targets = this.force.map((unit) => unit.tank).filter((tank) => tank.alive)
+    if (targets.length === 0) {
+      this.hud.flash('Brak celów dla nalotu')
+      return
+    }
+    this.artilleryWait = GAME_DAY_SECONDS
+    this.barrage.start(targets, this.scene)
+    this.audio.incomingBarrage()
+    this.hud.flash('Nalot artyleryjski!')
+  }
+
+  private tickArtillery(dt: number): void {
+    const wasCharging = this.artilleryWait > 0
+    this.artilleryWait = Math.max(0, this.artilleryWait - dt)
+    if (wasCharging && this.artilleryWait <= 0 && this.playing && this.player?.alive) {
+      this.hud.flash('Artyleria gotowa')
+    }
+    this.barrage.update(dt, (x, y, z, tank) => {
+      const at = new Vector3(x, y + 0.4, z)
+      this.fx.explode(at)
+      this.audio.artilleryBurst()
+      if (tank && tank.alive && Math.hypot(tank.position.x - x, tank.position.z - z) < 4.8) {
+        const killed = tank.takeDamage(99)
+        if (!killed) return
+        this.fx.igniteWreck(tank.position, tank.height)
+        this.onEnemyKilled(tank)
+      }
+    })
   }
 
   private updateProjectiles(dt: number): void {
@@ -464,6 +509,7 @@ export class Game {
   }
 
   private clearEnemies(): void {
+    this.barrage.clear()
     for (const unit of this.force) unit.tank.object.removeFromParent()
     for (const unit of this.allies) unit.tank.object.removeFromParent()
     for (const wreck of this.wrecks) wreck.object.removeFromParent()

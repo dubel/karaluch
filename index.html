@@ -30,6 +30,26 @@
             <div class="reload-bar"><div id="reload-fill"></div></div>
           </div>
         </div>
+        <div id="arty" class="arty ready">
+          <svg class="arty-glyph" viewBox="0 0 64 64" aria-hidden="true">
+            <defs>
+              <radialGradient id="arty-burst" cx="50%" cy="42%" r="55%">
+                <stop offset="0%" stop-color="#ffe7a0" />
+                <stop offset="45%" stop-color="#e09a3a" />
+                <stop offset="100%" stop-color="#7a2e0c" />
+              </radialGradient>
+            </defs>
+            <path
+              fill="url(#arty-burst)"
+              d="M32 6 L36 22 L52 14 L40 28 L58 32 L40 36 L50 50 L34 40 L32 58 L30 40 L14 50 L24 36 L6 32 L24 28 L12 14 L28 22 Z"
+            />
+            <ellipse cx="32" cy="33" rx="7.5" ry="11" fill="#c4a05a" stroke="#2c2416" stroke-width="1.4" />
+            <rect x="29.2" y="18" width="5.6" height="16" rx="1.2" fill="#8a6a32" />
+            <path d="M29.2 18 L32 10 L34.8 18 Z" fill="#d8c07a" />
+          </svg>
+          <kbd class="arty-key">A</kbd>
+          <div id="arty-veil" class="arty-veil"></div>
+        </div>
         <div id="notice" class="notice" hidden></div>
         <div id="credits" class="credits">
           TKS — Call_ada (CC-BY) · Pz.Kpfw. III — Stafford (CC-BY)<br />
@@ -51,6 +71,7 @@
             <li><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> jazda kadłubem (←/→ — celowanie w bok)</li>
             <li><kbd>Mysz</kbd> <kbd>W</kbd><kbd>S</kbd> elewacja lufy</li>
             <li><kbd>LPM</kbd> <kbd>Spacja</kbd> ogień</li>
+            <li><kbd>A</kbd> nalot artyleryjski (raz na dobę)</li>
             <li>zielony klucz — warsztat: naprawa 2%/s, bez ognia</li>
             <li><kbd>R</kbd> restart misji</li>
           </ul>

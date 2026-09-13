@@ -103,6 +103,9 @@ export const WORKSHOP_RADIUS = TKS_LENGTH * 2
 export const WORKSHOP_BARRELS_URL = new URL('../../assets/barrels_and_pallet.glb', import.meta.url).href
 export const WORKSHOP_WRENCH_URL = new URL('../../assets/monkey_wrench_low_poly.glb', import.meta.url).href
 export const WORKSHOP_HEAL_RATE = 0.02
+export const ENEMY_ACCURACY = 0.8
+export const ARTY_SHELLS_PER_TANK = 5
+export const ARTY_HIT_CHANCE = 0.8
 /** SE road past the village — opposite the TKS approach. */
 export const ENEMY_SPAWNS = [
   { x: 96, z: -80, yaw: Math.atan2(-96, 80) },

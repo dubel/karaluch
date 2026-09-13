@@ -5,6 +5,8 @@ const geometry = new SphereGeometry(0.12, 10, 8)
 export type ShotSide = 'player' | 'enemy'
 export type ShotTeam = 'pl' | 'de'
 
+const _scatterAxis = new Vector3()
+
 export class Projectile {
   readonly ownerId: string
   readonly team: ShotTeam
@@ -42,5 +44,15 @@ export class Projectile {
     if (this.age >= this.ttl || this.object.position.y < -1) {
       this.alive = false
     }
+  }
+
+  /** Nudge a well-aimed tracer so it still flies past the target. */
+  scatter(radians: number): void {
+    const speed = this.velocity.length()
+    _scatterAxis.set(Math.random() - 0.5, 0.4 + Math.random() * 0.6, Math.random() - 0.5)
+    if (_scatterAxis.lengthSq() < 1e-6) _scatterAxis.set(0, 1, 0)
+    _scatterAxis.normalize()
+    this.velocity.applyAxisAngle(_scatterAxis, radians)
+    this.velocity.setLength(speed)
   }
 }

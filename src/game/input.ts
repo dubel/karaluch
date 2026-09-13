@@ -5,6 +5,7 @@ export class Input {
   fireHeld = false
   fireClicked = false
   restart = false
+  artillery = false
   pointerLocked = false
 
   private readonly canvas: HTMLCanvasElement
@@ -35,6 +36,7 @@ export class Input {
     this.fireHeld = false
     this.mouseFire = false
     this.spaceFire = false
+    this.artillery = false
   }
 
   private canFire(): boolean {
@@ -60,6 +62,12 @@ export class Input {
     return restart
   }
 
+  consumeArtillery(): boolean {
+    const fired = this.artillery
+    this.artillery = false
+    return fired
+  }
+
   throttle(): number {
     let v = 0
     if (this.keys.has('ArrowUp')) v += 1
@@ -76,8 +84,8 @@ export class Input {
 
   steer(): number {
     let v = 0
-    if (this.keys.has('ArrowLeft') || this.keys.has('KeyA')) v += 1
-    if (this.keys.has('ArrowRight') || this.keys.has('KeyD')) v -= 1
+    if (this.keys.has('ArrowLeft')) v += 1
+    if (this.keys.has('ArrowRight')) v -= 1
     return v
   }
 
@@ -99,6 +107,7 @@ export class Input {
       this.fireHeld = true
     }
     if (event.code === 'KeyR') this.restart = true
+    if (event.code === 'KeyA') this.artillery = true
   }
 
   private onKeyUp = (event: KeyboardEvent): void => {

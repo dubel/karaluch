@@ -18,6 +18,8 @@ export class Hud {
   private readonly tag: HTMLElement
   private readonly notice: HTMLElement
   private readonly gunLabel: HTMLElement
+  private readonly arty: HTMLElement
+  private readonly artyVeil: HTMLElement
   private noticeHandle = 0
 
   constructor() {
@@ -34,6 +36,8 @@ export class Hud {
     this.tag = this.el('#overlay-tag')
     this.notice = this.el('#notice')
     this.gunLabel = this.el('#gun-label')
+    this.arty = this.el('#arty')
+    this.artyVeil = this.el('#arty-veil')
   }
 
   onPlay(handler: () => void): void {
@@ -88,6 +92,7 @@ export class Hud {
     pitchMin: number,
     pitchMax: number,
     repairing = false,
+    artyCharge = 1,
   ): void {
     this.hpPlayer.style.width = `${(playerHp / playerMax) * 100}%`
     this.hpPlayer.classList.toggle('repairing', repairing)
@@ -97,6 +102,8 @@ export class Hud {
     const span = Math.max(pitchMax, Math.abs(pitchMin), 0.01)
     const y = (-gunPitch / span) * 42
     this.pitchPip.style.transform = `translate(-50%, calc(-50% + ${y}px))`
+    this.arty.classList.toggle('ready', artyCharge >= 1)
+    this.artyVeil.style.transform = `scaleY(${1 - Math.max(0, Math.min(1, artyCharge))})`
   }
 
   flash(text: string): void {

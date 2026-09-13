@@ -15,6 +15,8 @@ export type RigConfig = {
   damage: number
   projectileSpeed: number
   cameraDistance: number
+  /** Extra yaw applied to the mesh so model forward matches hull +Z. */
+  visualYaw?: number
 }
 
 const playerUrl = new URL('../../assets/tks_20mm_tankette.glb', import.meta.url).href
@@ -141,10 +143,11 @@ export const BOT_RIG: RigConfig = {
   maxHp: 3,
   moveSpeed: 6.4,
   reverseSpeed: 3.1,
-  turnSpeed: 0.95,
-  turretTurnSpeed: 1.35,
+  turnSpeed: 1.35,
+  turretTurnSpeed: 1.85,
   fireCooldown: 1.55,
   damage: 1,
   projectileSpeed: 78,
   cameraDistance: 14,
+  visualYaw: -Math.PI / 2,
 }

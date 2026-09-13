@@ -144,20 +144,22 @@ export function applyRig(model: Object3D, config: RigConfig): TankRig {
   gun.add(muzzle)
 
   visual.updateMatrixWorld(true)
-  const axisBox = bboxOf(gunParts) ?? bboxOf(turretParts)
-  if (axisBox) {
-    axisBox.getSize(_size)
-    axisBox.getCenter(_center)
-    let yaw = 0
-    if (_size.x > _size.z * 1.15) {
-      yaw = _center.x >= 0 ? Math.PI / 2 : -Math.PI / 2
-    } else if (_center.z < 0) {
-      yaw = Math.PI
+  let yaw = config.visualYaw ?? 0
+  if (config.visualYaw === undefined) {
+    const axisBox = bboxOf(gunParts) ?? bboxOf(turretParts)
+    if (axisBox) {
+      axisBox.getSize(_size)
+      axisBox.getCenter(_center)
+      if (_size.x > _size.z * 1.15) {
+        yaw = _center.x >= 0 ? -Math.PI / 2 : Math.PI / 2
+      } else if (_center.z < 0) {
+        yaw = Math.PI
+      }
     }
-    if (Math.abs(yaw) > 1e-4) {
-      visual.rotation.y -= yaw
-      visual.updateMatrixWorld(true)
-    }
+  }
+  if (Math.abs(yaw) > 1e-4) {
+    visual.rotation.y -= yaw
+    visual.updateMatrixWorld(true)
   }
 
   const aligned = new Box3().setFromObject(visual)

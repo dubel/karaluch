@@ -33,7 +33,7 @@ import { Tank } from './Tank'
 import { terrainHeight } from './terrain'
 import { TrackMarks } from './TrackMarks'
 import { GameAudio } from './audio'
-import { CombatFx } from './fx'
+import { CombatFx, MAX_WRECKS } from './fx'
 import { Bot } from './Bot'
 import { GAME_DAY_SECONDS } from './atmosphere'
 import { releaseIntroMusic } from '../ui/intro'
@@ -132,6 +132,7 @@ export class Game {
       throw new Error(`Setup: ${error instanceof Error ? error.message : String(error)}`)
     }
     this.scene.add(this.player.object, this.tracks.mesh, this.fx.sparks, this.fx.smoke)
+    this.fx.prepare(this.scene)
     this.player.sitOnTerrain()
     this.cameraRig.reset(this.player)
     this.hud.readyToPlay()
@@ -229,7 +230,6 @@ export class Game {
 
     this.player?.tickHitSway(dt)
     for (const unit of this.force) unit.tank.tickHitSway(dt)
-    for (const wreck of this.wrecks) wreck.tickHitSway(dt)
     this.tracks.update(dt)
     this.fx.update(dt)
     this.updateProjectiles(dt)
@@ -295,7 +295,7 @@ export class Game {
       if (killed) {
         this.audio.explode()
         this.fx.explode(fxAt)
-        this.fx.igniteWreck(this.scene, tank.position, tank.height)
+        this.fx.igniteWreck(tank.position, tank.height)
         if (tank.id !== 'player') this.onEnemyKilled(tank)
       }
       shot.alive = false
@@ -304,6 +304,11 @@ export class Game {
 
   private onEnemyKilled(tank: Tank): void {
     this.kills += 1
+    if (this.wrecks.length >= MAX_WRECKS) {
+      const oldest = this.wrecks.shift()
+      oldest?.object.removeFromParent()
+      this.fx.douseOldest()
+    }
     this.wrecks.push(tank)
     const idx = this.force.findIndex((unit) => unit.tank === tank)
     if (idx >= 0) this.force.splice(idx, 1)

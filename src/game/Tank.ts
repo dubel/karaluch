@@ -48,6 +48,8 @@ export class Tank {
   hp: number
   cooldown = 0
   alive = true
+  vx = 0
+  vz = 0
 
   private readonly spawn = new Vector3()
   private readonly spawnYaw: number
@@ -107,6 +109,8 @@ export class Tank {
     this.gunPitch = 0
     this.hitRoll = 0
     this.hitRollVel = 0
+    this.vx = 0
+    this.vz = 0
     this.sitOnTerrain()
     this.turret.rotation.y = 0
     this.gun.rotation.x = 0
@@ -131,9 +135,11 @@ export class Tank {
         if (!mat.userData.baseColor) {
           mat.userData.baseColor = mat.color.clone()
         }
-        mat.color.multiplyScalar(0.28)
-        mat.emissive.setHex(0x6a2208)
-        mat.emissiveIntensity = 0.7
+        mat.color.multiplyScalar(0.11)
+        mat.emissive.setHex(0x000000)
+        mat.emissiveIntensity = 0
+        mat.metalness = Math.min(mat.metalness, 0.22)
+        mat.roughness = Math.max(mat.roughness, 0.86)
       }
       return true
     }
@@ -177,6 +183,8 @@ export class Tank {
       obstacles,
     )
     const yaw = blockedYaw ? this.hullYaw : nextYaw
+    const prevX = this.object.position.x
+    const prevZ = this.object.position.z
 
     const tryPos = (x: number, z: number, y: number): boolean => {
       if (collidesAny(x, z, y, this.halfWidth, this.halfLength, obstacles)) return false
@@ -231,6 +239,8 @@ export class Tank {
     }
 
     this.hullYaw = yaw
+    this.vx = dt > 1e-5 ? (this.object.position.x - prevX) / dt : 0
+    this.vz = dt > 1e-5 ? (this.object.position.z - prevZ) / dt : 0
     this.sitOnTerrain()
   }
 
@@ -302,6 +312,16 @@ export class Tank {
 
   aimError(worldYaw: number): number {
     return Math.abs(shortestDelta(this.aimWorldYaw(), worldYaw))
+  }
+
+  aimedAt(x: number, y: number, z: number, maxAngle = 0.09): boolean {
+    this.getShotRay(_muzzle, _dir)
+    _forward.set(x - _muzzle.x, y - _muzzle.y, z - _muzzle.z)
+    const len = _forward.length()
+    if (len < 0.01) return false
+    _forward.multiplyScalar(1 / len)
+    const dot = _dir.dot(_forward)
+    return dot > Math.cos(maxAngle)
   }
 
   getShotRay(origin: Vector3, direction: Vector3): void {

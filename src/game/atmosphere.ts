@@ -646,8 +646,8 @@ void main() {
   col += uMoonColor * moonDisk * crater * (0.85 + uMoonGlow * 0.9);
   col += uMoonColor * smoothstep(0.045, 0.018, moonAng) * uMoonGlow * 0.22;
 
-  float star = step(0.9972, hash12(dir.xz * 160.0 + dir.y * 80.0));
-  float twinkle = 0.45 + 0.55 * hash12(dir.zy * 40.0 + vec2(uTime * 0.2, dir.x));
+  float star = step(0.9986, hash12(dir.xz * 96.0 + dir.y * 48.0));
+  float twinkle = 0.82 + 0.18 * hash12(dir.zy * 22.0 + vec2(uTime * 0.05, dir.x));
   col += star * uNight * (1.0 - uCloudCover * 0.85) * twinkle * vec3(0.82, 0.88, 1.0);
 
   vec2 cuv = dir.xz / max(h + 0.2, 0.05);

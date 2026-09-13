@@ -27,8 +27,9 @@ type Particle = {
   size: number
 }
 
+export const MAX_WRECKS = 10
 const SPARK_MAX = 260
-const SMOKE_MAX = 360
+const SMOKE_MAX = 280
 const _c = new Color()
 const _puff = new Vector3()
 
@@ -42,7 +43,9 @@ export class CombatFx {
   private readonly smokePos: Float32Array
   private readonly smokeCol: Float32Array
   private readonly wrecks: { x: number; y: number; z: number; light: PointLight; t: number }[] = []
+  private readonly lightPool: PointLight[] = []
   private puffAcc = 0
+  private prepared = false
 
   constructor() {
     const sparkTex = circleTexture('rgba(255,220,120,1)', 'rgba(255,80,0,0)')
@@ -61,6 +64,18 @@ export class CombatFx {
     this.smoke.frustumCulled = false
   }
 
+  prepare(scene: Scene): void {
+    if (this.prepared) return
+    this.prepared = true
+    for (let i = 0; i < MAX_WRECKS; i++) {
+      const light = new PointLight(0xff6a1c, 0, 14, 2)
+      light.castShadow = false
+      light.visible = false
+      scene.add(light)
+      this.lightPool.push(light)
+    }
+  }
+
   hit(at: Vector3): void {
     for (let i = 0; i < 28; i++) this.spawnSpark(at, 5.5)
     for (let i = 0; i < 10; i++) this.spawnSmoke(at, 2.2)
@@ -71,30 +86,40 @@ export class CombatFx {
   }
 
   explode(at: Vector3): void {
-    for (let i = 0; i < 48; i++) this.spawnSpark(at, 11)
-    for (let i = 0; i < 22; i++) this.spawnFire(at)
-    for (let i = 0; i < 26; i++) this.spawnSmoke(at, 4.2)
+    for (let i = 0; i < 22; i++) this.spawnSpark(at, 8)
+    for (let i = 0; i < 14; i++) this.spawnFire(at, 1.1)
+    for (let i = 0; i < 12; i++) this.spawnSmoke(at, 3.4)
   }
 
-  igniteWreck(scene: Scene, at: Vector3, height: number): void {
-    const light = new PointLight(0xff5a14, 5.5, 22, 2)
-    light.position.set(at.x, at.y + height * 0.55, at.z)
-    light.castShadow = false
-    scene.add(light)
-    this.wrecks.push({ x: at.x, y: at.y + height * 0.42, z: at.z, light, t: Math.random() * 12 })
+  igniteWreck(at: Vector3, height: number): void {
+    const light = this.lightPool.find((item) => !item.userData.lit) ?? this.recycleLight()
+    if (!light) return
+    light.userData.lit = true
+    light.visible = true
+    light.intensity = 3.2
+    light.position.set(at.x, at.y + height * 0.72, at.z)
+    this.wrecks.push({ x: at.x, y: at.y + height * 0.55, z: at.z, light, t: Math.random() * 8 })
+  }
+
+  douseOldest(): void {
+    const wreck = this.wrecks.shift()
+    if (!wreck) return
+    wreck.light.intensity = 0
+    wreck.light.visible = false
+    wreck.light.userData.lit = false
   }
 
   update(dt: number): void {
     this.puffAcc += dt
-    const puff = this.puffAcc > 0.1
+    const puff = this.puffAcc > 0.12
     if (puff) this.puffAcc = 0
     for (const wreck of this.wrecks) {
       wreck.t += dt
-      wreck.light.intensity = 3.8 + Math.sin(wreck.t * 3.4) * 1.6 + Math.sin(wreck.t * 7.1) * 0.7
+      wreck.light.intensity = 2.4 + Math.sin(wreck.t * 2.8) * 0.9 + Math.sin(wreck.t * 6.2) * 0.35
       if (puff) {
-        _puff.set(wreck.x + (Math.random() - 0.5) * 0.8, wreck.y, wreck.z + (Math.random() - 0.5) * 0.8)
-        this.spawnSmoke(_puff, 1.6)
-        if (Math.random() < 0.55) this.spawnFire(_puff)
+        _puff.set(wreck.x + (Math.random() - 0.5) * 0.55, wreck.y, wreck.z + (Math.random() - 0.5) * 0.55)
+        this.spawnSmoke(_puff, 1.35)
+        for (let n = 0; n < 3; n++) this.spawnFire(_puff, 0.4)
       }
     }
     stepSparks(this.sparkList, this.sparkPos, this.sparkCol, dt, SPARK_MAX)
@@ -112,12 +137,21 @@ export class CombatFx {
     this.smokeList.length = 0
     this.sparks.geometry.setDrawRange(0, 0)
     this.smoke.geometry.setDrawRange(0, 0)
-    for (const wreck of this.wrecks) wreck.light.removeFromParent()
+    for (const light of this.lightPool) {
+      light.intensity = 0
+      light.visible = false
+      light.userData.lit = false
+    }
     this.wrecks.length = 0
   }
 
+  private recycleLight(): PointLight | undefined {
+    this.douseOldest()
+    return this.lightPool.find((item) => !item.userData.lit)
+  }
+
   private spawnSpark(at: Vector3, speed: number): void {
-    if (this.sparkList.length >= SPARK_MAX) this.sparkList.shift()
+    if (this.sparkList.length >= SPARK_MAX) return
     const dir = randDir()
     this.sparkList.push({
       kind: 'spark',
@@ -133,36 +167,35 @@ export class CombatFx {
     })
   }
 
-  private spawnFire(at: Vector3): void {
-    if (this.sparkList.length >= SPARK_MAX) this.sparkList.shift()
-    const dir = randDir()
+  private spawnFire(at: Vector3, spread: number): void {
+    if (this.sparkList.length >= SPARK_MAX) return
     this.sparkList.push({
       kind: 'fire',
-      x: at.x,
-      y: at.y + 0.5,
-      z: at.z,
-      vx: dir.x * 4,
-      vy: 3 + Math.random() * 5,
-      vz: dir.z * 4,
+      x: at.x + (Math.random() - 0.5) * spread,
+      y: at.y + Math.random() * 0.25,
+      z: at.z + (Math.random() - 0.5) * spread,
+      vx: (Math.random() - 0.5) * 0.55,
+      vy: 1.6 + Math.random() * 2.4,
+      vz: (Math.random() - 0.5) * 0.55,
       life: 0,
-      max: 0.45 + Math.random() * 0.35,
-      size: 0.18,
+      max: 0.55 + Math.random() * 0.45,
+      size: 0.22,
     })
   }
 
   private spawnSmoke(at: Vector3, lift: number): void {
-    if (this.smokeList.length >= SMOKE_MAX) this.smokeList.shift()
+    if (this.smokeList.length >= SMOKE_MAX) return
     const dir = randDir()
     this.smokeList.push({
       kind: 'smoke',
-      x: at.x + dir.x * 0.3,
-      y: at.y + 0.35 + Math.random() * 0.5,
-      z: at.z + dir.z * 0.3,
-      vx: dir.x * 0.6,
-      vy: lift * (0.5 + Math.random() * 0.6),
-      vz: dir.z * 0.6,
+      x: at.x + dir.x * 0.25,
+      y: at.y + 0.55 + Math.random() * 0.4,
+      z: at.z + dir.z * 0.25,
+      vx: dir.x * 0.45,
+      vy: lift * (0.55 + Math.random() * 0.5),
+      vz: dir.z * 0.45,
       life: 0,
-      max: 3.4 + Math.random() * 2.2,
+      max: 2.6 + Math.random() * 1.6,
       size: 0.55,
     })
   }
@@ -179,10 +212,17 @@ function stepSparks(
     const p = list[i]
     p.life += dt
     if (p.life >= p.max) {
-      list.splice(i, 1)
+      list[i] = list[list.length - 1]
+      list.pop()
       continue
     }
-    p.vy -= 18 * dt
+    if (p.kind === 'fire') {
+      p.vy += 2.8 * dt
+      p.vx *= Math.exp(-2.2 * dt)
+      p.vz *= Math.exp(-2.2 * dt)
+    } else {
+      p.vy -= 18 * dt
+    }
     p.x += p.vx * dt
     p.y += p.vy * dt
     p.z += p.vz * dt
@@ -198,7 +238,7 @@ function stepSparks(
     pos[i * 3 + 2] = p.z
     const t = p.life / p.max
     if (p.kind === 'fire') {
-      _c.setRGB(1, 0.45 + (1 - t) * 0.35, 0.08)
+      _c.setRGB(1, 0.42 + (1 - t) * 0.5, 0.06 * (1 - t))
     } else {
       _c.setRGB(1, 0.7 - t * 0.4, 0.15)
     }
@@ -219,7 +259,8 @@ function stepSmoke(
     const p = list[i]
     p.life += dt
     if (p.life >= p.max) {
-      list.splice(i, 1)
+      list[i] = list[list.length - 1]
+      list.pop()
       continue
     }
     p.vx *= 0.96
@@ -262,7 +303,7 @@ function makeCloud(count: number, map: CanvasTexture, additive: boolean): {
   geo.setDrawRange(0, 0)
   const mat = new PointsMaterial({
     map,
-    size: additive ? 0.7 : 3.2,
+    size: additive ? 1.15 : 3.2,
     vertexColors: true,
     transparent: true,
     depthWrite: false,

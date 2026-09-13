@@ -126,6 +126,7 @@ export class Game {
     this.playing = true
     this.hud.hideOverlay()
     this.input.lockPointer()
+    this.audio.prime()
     void this.audio.unlock()
   }
 

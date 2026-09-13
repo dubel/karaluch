@@ -1,10 +1,58 @@
-const ENGINE_URL = new URL('../../assets/sfx/engine_loop.ogg', import.meta.url).href
-const CANNON_URL = new URL('../../assets/sfx/cannon_fire.ogg', import.meta.url).href
+const ENGINE_OGG = new URL('../../assets/sfx/engine_loop.ogg', import.meta.url).href
+const ENGINE_AAC = new URL('../../assets/sfx/engine_loop.m4a', import.meta.url).href
+const CANNON_OGG = new URL('../../assets/sfx/cannon_fire.ogg', import.meta.url).href
+const CANNON_AAC = new URL('../../assets/sfx/cannon_fire.m4a', import.meta.url).href
 const EXPLODE_URL = new URL('../../assets/sfx/mechanical_explosion.wav', import.meta.url).href
-const RAIN_URL = new URL('../../assets/sfx/rain_loop.ogg', import.meta.url).href
-const THUNDER_NEAR_URL = new URL('../../assets/sfx/thunder_near.ogg', import.meta.url).href
-const THUNDER_FAR_URL = new URL('../../assets/sfx/thunder_far.ogg', import.meta.url).href
-const BIRD_URL = new URL('../../assets/sfx/bird_robin.ogg', import.meta.url).href
+const RAIN_OGG = new URL('../../assets/sfx/rain_loop.ogg', import.meta.url).href
+const RAIN_AAC = new URL('../../assets/sfx/rain_loop.m4a', import.meta.url).href
+const THUNDER_NEAR_OGG = new URL('../../assets/sfx/thunder_near.ogg', import.meta.url).href
+const THUNDER_NEAR_AAC = new URL('../../assets/sfx/thunder_near.m4a', import.meta.url).href
+const THUNDER_FAR_OGG = new URL('../../assets/sfx/thunder_far.ogg', import.meta.url).href
+const THUNDER_FAR_AAC = new URL('../../assets/sfx/thunder_far.m4a', import.meta.url).href
+const BIRD_OGG = new URL('../../assets/sfx/bird_robin.ogg', import.meta.url).href
+const BIRD_AAC = new URL('../../assets/sfx/bird_robin.m4a', import.meta.url).href
+
+const SILENT_WAV =
+  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
+
+function preferAac(): boolean {
+  const probe = document.createElement('audio')
+  return probe.canPlayType('audio/ogg; codecs="vorbis"') !== 'probably'
+}
+
+function pick(ogg: string, aac: string): string {
+  return preferAac() ? aac : ogg
+}
+
+function makeAudioContext(): AudioContext {
+  const Ctor =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+  return new Ctor()
+}
+
+function kickHtmlAudio(): void {
+  const el = new Audio()
+  el.src = SILENT_WAV
+  el.preload = 'auto'
+  el.volume = 0.01
+  void el.play().catch(() => undefined)
+}
+
+async function decodeBuffer(ctx: AudioContext, data: ArrayBuffer): Promise<AudioBuffer> {
+  const copy = data.slice(0)
+  try {
+    return await ctx.decodeAudioData(copy)
+  } catch {
+    const again = data.slice(0)
+    return await new Promise((resolve, reject) => {
+      const ok = ctx.decodeAudioData(again, resolve, reject)
+      if (ok && typeof (ok as Promise<AudioBuffer>).then === 'function') {
+        void (ok as Promise<AudioBuffer>).then(resolve, reject)
+      }
+    })
+  }
+}
 
 export class GameAudio {
   private ctx: AudioContext | null = null
@@ -19,16 +67,17 @@ export class GameAudio {
   private windGain: GainNode | null = null
   private birdCd = 2
   private ready = false
+  private unlocking: Promise<void> | null = null
 
   async load(): Promise<void> {
     const jobs = [
-      ['engine', ENGINE_URL],
-      ['cannon', CANNON_URL],
+      ['engine', pick(ENGINE_OGG, ENGINE_AAC)],
+      ['cannon', pick(CANNON_OGG, CANNON_AAC)],
       ['explode', EXPLODE_URL],
-      ['rain', RAIN_URL],
-      ['thunderNear', THUNDER_NEAR_URL],
-      ['thunderFar', THUNDER_FAR_URL],
-      ['bird', BIRD_URL],
+      ['rain', pick(RAIN_OGG, RAIN_AAC)],
+      ['thunderNear', pick(THUNDER_NEAR_OGG, THUNDER_NEAR_AAC)],
+      ['thunderFar', pick(THUNDER_FAR_OGG, THUNDER_FAR_AAC)],
+      ['bird', pick(BIRD_OGG, BIRD_AAC)],
     ] as const
     await Promise.all(
       jobs.map(async ([name, url]) => {
@@ -39,22 +88,53 @@ export class GameAudio {
     )
   }
 
+  prime(): void {
+    kickHtmlAudio()
+    if (!this.ctx) {
+      const ctx = makeAudioContext()
+      this.ctx = ctx
+      this.master = ctx.createGain()
+      this.master.gain.value = 0.7
+      this.master.connect(ctx.destination)
+    }
+    if (this.ctx.state === 'suspended') void this.ctx.resume()
+  }
+
   async unlock(): Promise<void> {
+    this.prime()
     if (this.ready) {
       await this.ctx?.resume()
       return
     }
-    const ctx = new AudioContext()
-    this.ctx = ctx
-    this.master = ctx.createGain()
-    this.master.gain.value = 0.7
-    this.master.connect(ctx.destination)
-    this.decoded.set('hit', makeHitBuffer(ctx))
-    for (const [name, buf] of this.raw) {
-      this.decoded.set(name, await ctx.decodeAudioData(buf.slice(0)))
+    if (this.unlocking) {
+      await this.unlocking
+      return
     }
-    this.startEngine()
-    this.startWeatherPads()
+    this.unlocking = this.finishUnlock()
+    try {
+      await this.unlocking
+    } finally {
+      this.unlocking = null
+    }
+  }
+
+  private async finishUnlock(): Promise<void> {
+    const ctx = this.ctx
+    if (!ctx) return
+    await ctx.resume()
+    if (!this.decoded.has('hit')) this.decoded.set('hit', makeHitBuffer(ctx))
+    await Promise.all(
+      [...this.raw].map(async ([name, buf]) => {
+        if (this.decoded.has(name)) return
+        try {
+          this.decoded.set(name, await decodeBuffer(ctx, buf))
+        } catch {
+          /* iOS: skip a bad file instead of killing all audio */
+        }
+      }),
+    )
+    if (!this.engineSrc) this.startEngine()
+    if (!this.rainGain) this.startWeatherPads()
     this.ready = true
     await ctx.resume()
   }
@@ -140,6 +220,7 @@ export class GameAudio {
     const ctx = this.ctx
     const buf = this.decoded.get(name)
     if (!ctx || !this.master || !buf) return
+    if (ctx.state === 'suspended') void ctx.resume()
     const src = ctx.createBufferSource()
     src.buffer = buf
     src.playbackRate.value = rate

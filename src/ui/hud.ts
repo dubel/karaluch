@@ -20,11 +20,14 @@ export class Hud {
   }
 
   onPlay(handler: () => void): void {
-    this.playBtn.addEventListener('click', handler)
-    this.overlay.addEventListener('click', (event) => {
+    const run = (): void => {
       if (this.playBtn.disabled) return
-      if (event.target === this.playBtn) return
       handler()
+    }
+    this.playBtn.addEventListener('pointerup', run)
+    this.overlay.addEventListener('pointerup', (event) => {
+      if (event.target === this.playBtn) return
+      run()
     })
   }
 

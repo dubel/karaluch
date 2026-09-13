@@ -28,7 +28,7 @@ import {
   WORKSHOP_BARRELS_URL,
   WORKSHOP_HEAL_RATE,
   WORKSHOP_WRENCH_URL,
-  allyArrivesOnWaveClear,
+  allyArrivesOnKill,
   waveEnemyCount,
 } from './config'
 import { Input } from './input'
@@ -433,6 +433,7 @@ export class Game {
 
   private onEnemyKilled(tank: Tank): void {
     this.kills += 1
+    if (allyArrivesOnKill(this.kills)) this.spawnAlly()
     if (this.wrecks.length >= MAX_WRECKS) {
       const oldest = this.wrecks.shift()
       oldest?.object.removeFromParent()
@@ -444,7 +445,6 @@ export class Game {
     if (this.force.length === 0) {
       this.wavesCleared += 1
       this.spawnWait = 2.4
-      if (allyArrivesOnWaveClear(this.wavesCleared)) this.spawnAlly()
     }
   }
 

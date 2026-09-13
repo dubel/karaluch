@@ -179,7 +179,16 @@ canvas#game {
   pointer-events: none;
   position: absolute;
   left: 22px;
-  bottom: 28px;
+  bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 78px;
+}
+
+.arty-frame {
+  position: relative;
   width: 72px;
   height: 72px;
   border: 1px solid #8a6a32;
@@ -190,7 +199,7 @@ canvas#game {
 
 .arty-glyph {
   position: absolute;
-  inset: 8px 8px 18px;
+  inset: 6px 8px 16px;
   width: auto;
   height: auto;
   filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.7));
@@ -208,6 +217,14 @@ canvas#game {
   background: #1a160e;
 }
 
+.arty-caption {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #e8d49a;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.85);
+}
+
 .arty-veil {
   position: absolute;
   inset: 0;
@@ -216,7 +233,7 @@ canvas#game {
   transform: scaleY(0);
 }
 
-.arty.ready {
+.arty.ready .arty-frame {
   border-color: #e0b45a;
   box-shadow: 0 0 14px rgba(224, 154, 58, 0.45);
 }

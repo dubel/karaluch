@@ -119,10 +119,10 @@ export function waveEnemyCount(waveIndex: number): number {
   return 1 + Math.floor(Math.random() * 3)
 }
 
-/** Ally TKS after waves 6, 9, then every 2: 11, 13, 15… */
-export function allyArrivesOnWaveClear(wavesCleared: number): boolean {
-  if (wavesCleared === 6 || wavesCleared === 9) return true
-  return wavesCleared > 9 && (wavesCleared - 9) % 2 === 0
+/** Ally TKS after 4 and 6 kills, then every 3: 9, 12, 15, 18… */
+export function allyArrivesOnKill(kills: number): boolean {
+  if (kills === 4 || kills === 6) return true
+  return kills >= 9 && (kills - 9) % 3 === 0
 }
 
 export const PLAYER_RIG: RigConfig = {

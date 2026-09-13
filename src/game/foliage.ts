@@ -14,6 +14,7 @@ import {
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { Aabb } from './collision'
 import { ARENA_HALF, BOT_SPAWN, PLAYER_SPAWN, TREE_HEIGHT } from './config'
+import { roadDistance } from './road'
 import { stripJunk } from './rig'
 import { terrainHeight } from './terrain'
 
@@ -106,6 +107,7 @@ export function sowFoliage(
       wall: 5.5,
       skip: 0.22,
       grove: 0.38,
+      road: 7.2,
     }),
     8.6,
   )
@@ -126,7 +128,7 @@ export function sowFoliage(
   plant(
     scene,
     circle,
-    scatter(10.8, rng, { house: 11, spawn: 1.6, wall: 2.8, skip: 0.12, grove: 0.08 }).map((p) => ({
+    scatter(10.8, rng, { house: 11, spawn: 1.6, wall: 2.8, skip: 0.12, grove: 0.08, road: 3.4 }).map((p) => ({
       x: p.x,
       z: p.z,
       yaw: rng() * Math.PI * 2,
@@ -137,7 +139,7 @@ export function sowFoliage(
   plant(
     scene,
     tuft,
-    scatter(2.35, rng, { house: 10, spawn: 1.2, wall: 2.0, skip: 0.08, grove: 0.04 }).map((p) => ({
+    scatter(2.35, rng, { house: 10, spawn: 1.2, wall: 2.0, skip: 0.08, grove: 0.04, road: 2.5 }).map((p) => ({
       x: p.x,
       z: p.z,
       yaw: rng() * Math.PI * 2,
@@ -148,7 +150,7 @@ export function sowFoliage(
   plant(
     scene,
     bush,
-    scatter(9.2, rng, { house: 12, spawn: 4, wall: 3, skip: 0.28, grove: 0.2 }).map((p) => ({
+    scatter(9.2, rng, { house: 12, spawn: 4, wall: 3, skip: 0.28, grove: 0.2, road: 4.2 }).map((p) => ({
       x: p.x,
       z: p.z,
       yaw: rng() * Math.PI * 2,
@@ -159,7 +161,7 @@ export function sowFoliage(
   plant(
     scene,
     plantGreen,
-    scatter(5.4, rng, { house: 9.5, spawn: 2.2, wall: 2.4, skip: 0.3, grove: 0.1 }).map((p) => ({
+    scatter(5.4, rng, { house: 9.5, spawn: 2.2, wall: 2.4, skip: 0.3, grove: 0.1, road: 2.8 }).map((p) => ({
       x: p.x,
       z: p.z,
       yaw: rng() * Math.PI * 2,
@@ -170,7 +172,7 @@ export function sowFoliage(
   plant(
     scene,
     plantBrown,
-    scatter(6.8, rng, { house: 9.5, spawn: 2.2, wall: 2.4, skip: 0.42, grove: 0 }).map((p) => ({
+    scatter(6.8, rng, { house: 9.5, spawn: 2.2, wall: 2.4, skip: 0.42, grove: 0, road: 2.8 }).map((p) => ({
       x: p.x,
       z: p.z,
       yaw: rng() * Math.PI * 2,
@@ -179,7 +181,7 @@ export function sowFoliage(
     { slope: 0.8, tint: true, rng, wind },
   )
 
-  const flowerPts = scatter(6.2, rng, { house: 10.5, spawn: 2.6, wall: 2.6, skip: 0.34, grove: 0.15 })
+  const flowerPts = scatter(6.2, rng, { house: 10.5, spawn: 2.6, wall: 2.6, skip: 0.34, grove: 0.15, road: 2.4 })
   const flowerSpots: Spot[][] = flowers.map(() => [])
   for (const p of flowerPts) {
     flowerSpots[Math.floor(rng() * flowers.length)].push({
@@ -278,7 +280,7 @@ function addTreeCollision(spots: Spot[], obstacles: Aabb[], cameraBlockers: Aabb
 function scatter(
   cell: number,
   rng: () => number,
-  opts: { house: number; spawn: number; wall: number; skip: number; grove: number },
+  opts: { house: number; spawn: number; wall: number; skip: number; grove: number; road?: number },
 ): { x: number; z: number }[] {
   const pts: { x: number; z: number }[] = []
   const limit = ARENA_HALF - opts.wall
@@ -292,6 +294,8 @@ function scatter(
       if (Math.hypot(px, pz) < opts.house) continue
       if (Math.hypot(px - PLAYER_SPAWN.x, pz - PLAYER_SPAWN.z) < opts.spawn) continue
       if (Math.hypot(px - BOT_SPAWN.x, pz - BOT_SPAWN.z) < opts.spawn) continue
+      const roadClear = opts.road ?? 0
+      if (roadClear > 0 && roadDistance(px, pz) < roadClear) continue
       if (opts.grove > 0) {
         const grove = Math.sin(px * 0.039 + 1.7) * Math.sin(pz * 0.034 + 0.4)
         if (grove < -0.18 && rng() < opts.grove) continue

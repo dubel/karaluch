@@ -28,6 +28,7 @@ export const HOUSE_TARGET_LENGTH = 14
 export const ARENA_HALF = 168
 export const FOLIAGE_URL = new URL('../../assets/low_poly_trees_flowers_and_grass.glb', import.meta.url).href
 export const GRASS_PATCH_URL = new URL('../../assets/grass_patches_-_circle.glb', import.meta.url).href
+export const ROAD_DIFF_URL = new URL('../../assets/textures/muddy_tracks_diff_2k.jpg', import.meta.url).href
 export const TREE_HEIGHT = 9.5
 export const PLAYER_SPAWN = { x: -96, z: 88, yaw: Math.PI * 0.72 }
 export const BOT_SPAWN = { x: 96, z: -80, yaw: -Math.PI * 0.28 }

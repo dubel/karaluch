@@ -4,6 +4,7 @@ import {
   PCFSoftShadowMap,
   Scene,
   SRGBColorSpace,
+  TextureLoader,
   Vector3,
   WebGLRenderer,
 } from 'three'
@@ -20,6 +21,7 @@ import {
   HOUSE_URL,
   PLAYER_RIG,
   PLAYER_SPAWN,
+  ROAD_DIFF_URL,
 } from './config'
 import { Input } from './input'
 import { Projectile } from './Projectile'
@@ -68,24 +70,28 @@ export class Game {
       this.hud.setLoadProgress(total === 0 ? 0 : (loaded / total) * 100)
     }
     const loader = new GLTFLoader(manager)
+    const texLoader = new TextureLoader(manager)
     let playerGltf
     let botGltf
     let houseGltf
     let foliageGltf
     let grassGltf
+    let roadDiff
     try {
-      ;[playerGltf, botGltf, houseGltf, foliageGltf, grassGltf] = await Promise.all([
+      ;[playerGltf, botGltf, houseGltf, foliageGltf, grassGltf, roadDiff] = await Promise.all([
         loader.loadAsync(PLAYER_RIG.url),
         loader.loadAsync(BOT_RIG.url),
         loader.loadAsync(HOUSE_URL),
         loader.loadAsync(FOLIAGE_URL),
         loader.loadAsync(GRASS_PATCH_URL),
+        texLoader.loadAsync(ROAD_DIFF_URL),
         this.audio.load(),
       ])
     } catch (error) {
       throw new Error(`GLB: ${error instanceof Error ? error.message : String(error)}`)
     }
     try {
+      this.arena.addRoad(roadDiff)
       this.arena.addHouse(houseGltf.scene)
       this.arena.addFoliage(foliageGltf.scene, grassGltf.scene)
       this.player = new Tank(

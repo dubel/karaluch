@@ -13,10 +13,12 @@ import {
   SRGBColorSpace,
   Scene,
   type Object3D,
+  type Texture,
 } from 'three'
 import type { Aabb } from './collision'
 import { ARENA_HALF, HOUSE_TARGET_LENGTH } from './config'
 import { sowFoliage, type WindClock } from './foliage'
+import { createRoadMesh } from './road'
 import { normalizeModel, stripJunk } from './rig'
 import { displaceTerrain } from './terrain'
 
@@ -85,6 +87,17 @@ export class Arena {
 
   tick(dt: number): void {
     this.wind.value += dt
+  }
+
+  addRoad(map: Texture): void {
+    const road = createRoadMesh(map)
+    road.traverse((child) => {
+      const mesh = child as Mesh
+      if (!mesh.isMesh) return
+      mesh.receiveShadow = true
+      mesh.castShadow = false
+    })
+    this.scene.add(road)
   }
 
   addHouse(model: Object3D): void {

@@ -3,9 +3,11 @@ import { Mesh, MeshStandardMaterial, SphereGeometry, Vector3 } from 'three'
 const geometry = new SphereGeometry(0.12, 10, 8)
 
 export type ShotSide = 'player' | 'enemy'
+export type ShotTeam = 'pl' | 'de'
 
 export class Projectile {
   readonly ownerId: string
+  readonly team: ShotTeam
   readonly damage: number
   readonly object: Mesh
   readonly velocity: Vector3
@@ -22,6 +24,7 @@ export class Projectile {
     side: ShotSide,
   ) {
     this.ownerId = ownerId
+    this.team = side === 'player' ? 'pl' : 'de'
     this.damage = damage
     this.velocity = direction.clone().normalize().multiplyScalar(speed)
     const tracer =

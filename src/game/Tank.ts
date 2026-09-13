@@ -31,8 +31,11 @@ function shortestDelta(from: number, to: number): number {
   return wrapPi(to - from)
 }
 
+export type Team = 'pl' | 'de'
+
 export class Tank {
   readonly id: string
+  readonly team: Team
   readonly config: RigConfig
   readonly object: Group
   readonly turret: Group
@@ -59,8 +62,16 @@ export class Tank {
   private terrainPitch = 0
   private terrainRoll = 0
 
-  constructor(id: string, model: Object3D, config: RigConfig, spawn: Vector3, spawnYaw: number) {
+  constructor(
+    id: string,
+    model: Object3D,
+    config: RigConfig,
+    spawn: Vector3,
+    spawnYaw: number,
+    team: Team = id === 'player' || id.startsWith('ally') ? 'pl' : 'de',
+  ) {
     this.id = id
+    this.team = team
     this.config = config
     const rig: TankRig = applyRig(model, config)
     this.object = rig.root
@@ -121,6 +132,11 @@ export class Tank {
       mat.emissive.setHex(0x000000)
       mat.emissiveIntensity = 1
     }
+  }
+
+  heal(amount: number): void {
+    if (!this.alive) return
+    this.hp = Math.min(this.config.maxHp, this.hp + amount)
   }
 
   takeDamage(amount: number): boolean {
@@ -408,7 +424,7 @@ export class Tank {
       _dir,
       this.config.projectileSpeed,
       this.config.damage,
-      this.id === 'player' ? 'player' : 'enemy',
+      this.team === 'pl' ? 'player' : 'enemy',
     )
   }
 }

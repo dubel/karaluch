@@ -16,6 +16,9 @@ export class Hud {
   private readonly help: HTMLElement
   private readonly stats: HTMLElement
   private readonly tag: HTMLElement
+  private readonly notice: HTMLElement
+  private readonly gunLabel: HTMLElement
+  private noticeHandle = 0
 
   constructor() {
     this.overlay = this.el('#overlay')
@@ -29,6 +32,8 @@ export class Hud {
     this.help = this.el('#overlay-help')
     this.stats = this.el('#overlay-stats')
     this.tag = this.el('#overlay-tag')
+    this.notice = this.el('#notice')
+    this.gunLabel = this.el('#gun-label')
   }
 
   onPlay(handler: () => void): void {
@@ -82,13 +87,27 @@ export class Hud {
     gunPitch: number,
     pitchMin: number,
     pitchMax: number,
+    repairing = false,
   ): void {
     this.hpPlayer.style.width = `${(playerHp / playerMax) * 100}%`
+    this.hpPlayer.classList.toggle('repairing', repairing)
     this.kills.textContent = String(kills)
-    this.reload.style.width = `${Math.max(0, Math.min(1, reload)) * 100}%`
+    this.reload.style.width = `${repairing ? 0 : Math.max(0, Math.min(1, reload)) * 100}%`
+    this.gunLabel.textContent = repairing ? 'Naprawa — bez ognia' : 'Działo'
     const span = Math.max(pitchMax, Math.abs(pitchMin), 0.01)
     const y = (-gunPitch / span) * 42
     this.pitchPip.style.transform = `translate(-50%, calc(-50% + ${y}px))`
+  }
+
+  flash(text: string): void {
+    this.notice.textContent = text
+    this.notice.hidden = false
+    this.notice.classList.add('show')
+    window.clearTimeout(this.noticeHandle)
+    this.noticeHandle = window.setTimeout(() => {
+      this.notice.classList.remove('show')
+      this.notice.hidden = true
+    }, 4200)
   }
 
   showDefeat(report: MissionStats): void {

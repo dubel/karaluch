@@ -25,6 +25,10 @@ import {
   PLAYER_SPAWN,
   ROAD_DIFF_URL,
   VILLAGE_PROPS,
+  WORKSHOP_BARRELS_URL,
+  WORKSHOP_HEAL_RATE,
+  WORKSHOP_WRENCH_URL,
+  allyArrivesOnWaveClear,
   waveEnemyCount,
 } from './config'
 import { Input } from './input'
@@ -35,11 +39,12 @@ import { TrackMarks } from './TrackMarks'
 import { GameAudio } from './audio'
 import { CombatFx, MAX_WRECKS } from './fx'
 import { Bot } from './Bot'
+import { Workshop } from './workshop'
 import { GAME_DAY_SECONDS } from './atmosphere'
 import { releaseIntroMusic } from '../ui/intro'
 import { formatHeldTime, type Hud } from '../ui/hud'
 
-type EnemyUnit = { tank: Tank; ai: Bot }
+type CombatUnit = { tank: Tank; ai: Bot }
 
 export class Game {
   private readonly renderer: WebGLRenderer
@@ -53,11 +58,14 @@ export class Game {
   private readonly tracks = new TrackMarks()
   private readonly audio = new GameAudio()
   private readonly fx = new CombatFx()
-  private readonly force: EnemyUnit[] = []
+  private readonly force: CombatUnit[] = []
+  private readonly allies: CombatUnit[] = []
   private readonly wrecks: Tank[] = []
   private arena!: Arena
+  private workshop!: Workshop
   private player!: Tank
   private botTemplate!: Object3D
+  private playerTemplate!: Object3D
   private playing = false
   private roundOver = false
   private kills = 0
@@ -66,6 +74,7 @@ export class Game {
   private spawnWait = 0
   private missionTime = 0
   private enemySeq = 0
+  private allySeq = 0
 
   constructor(canvas: HTMLCanvasElement, hud: Hud) {
     this.hud = hud
@@ -96,19 +105,33 @@ export class Game {
     let grassGltf
     let roadDiff
     let perimeterGltf
+    let barrelsGltf
+    let wrenchGltf
     try {
-      ;[playerGltf, botGltf, houseGltf, villageGltfs, foliageGltf, grassGltf, roadDiff, perimeterGltf] =
-        await Promise.all([
-          loader.loadAsync(PLAYER_RIG.url),
-          loader.loadAsync(BOT_RIG.url),
-          loader.loadAsync(HOUSE_URL),
-          Promise.all(VILLAGE_PROPS.map((prop) => loader.loadAsync(prop.url))),
-          loader.loadAsync(FOLIAGE_URL),
-          loader.loadAsync(GRASS_PATCH_URL),
-          texLoader.loadAsync(ROAD_DIFF_URL),
-          loader.loadAsync(PERIMETER_URL),
-          this.audio.load(),
-        ])
+      ;[
+        playerGltf,
+        botGltf,
+        houseGltf,
+        villageGltfs,
+        foliageGltf,
+        grassGltf,
+        roadDiff,
+        perimeterGltf,
+        barrelsGltf,
+        wrenchGltf,
+      ] = await Promise.all([
+        loader.loadAsync(PLAYER_RIG.url),
+        loader.loadAsync(BOT_RIG.url),
+        loader.loadAsync(HOUSE_URL),
+        Promise.all(VILLAGE_PROPS.map((prop) => loader.loadAsync(prop.url))),
+        loader.loadAsync(FOLIAGE_URL),
+        loader.loadAsync(GRASS_PATCH_URL),
+        texLoader.loadAsync(ROAD_DIFF_URL),
+        loader.loadAsync(PERIMETER_URL),
+        loader.loadAsync(WORKSHOP_BARRELS_URL),
+        loader.loadAsync(WORKSHOP_WRENCH_URL),
+        this.audio.load(),
+      ])
     } catch (error) {
       throw new Error(`GLB: ${error instanceof Error ? error.message : String(error)}`)
     }
@@ -120,13 +143,22 @@ export class Game {
       }
       this.arena.addFoliage(foliageGltf.scene, grassGltf.scene)
       this.arena.addPerimeter(perimeterGltf.scene)
+      this.workshop = new Workshop(
+        this.scene,
+        barrelsGltf.scene,
+        wrenchGltf.scene,
+        this.arena.obstacles,
+        this.arena.cameraBlockers,
+      )
       this.botTemplate = botGltf.scene
+      this.playerTemplate = playerGltf.scene
       this.player = new Tank(
         'player',
-        playerGltf.scene,
+        this.playerTemplate.clone(true),
         PLAYER_RIG,
         new Vector3(PLAYER_SPAWN.x, 0, PLAYER_SPAWN.z),
         PLAYER_SPAWN.yaw,
+        'pl',
       )
     } catch (error) {
       throw new Error(`Setup: ${error instanceof Error ? error.message : String(error)}`)
@@ -163,6 +195,7 @@ export class Game {
     this.spawnWait = 0
     this.missionTime = 0
     this.enemySeq = 0
+    this.allySeq = 0
     this.clearEnemies()
     this.player.reset()
     this.tracks.clear()
@@ -214,22 +247,41 @@ export class Game {
       this.audio.setMotion(Math.max(Math.abs(this.input.throttle()), Math.abs(this.input.steer()) * 0.55))
       this.player.applyAimPose()
       this.player.tickCooldown(dt)
-      if (this.input.consumeFireClick() || (this.input.fireHeld && this.player.cooldown <= 0)) {
+      const repairing = this.workshop.contains(this.player.position.x, this.player.position.z)
+      if (repairing) {
+        this.player.heal(this.player.config.maxHp * WORKSHOP_HEAL_RATE * dt)
+      }
+      if (
+        !repairing &&
+        (this.input.consumeFireClick() || (this.input.fireHeld && this.player.cooldown <= 0))
+      ) {
         this.cameraRig.getAimPoint(this.aimPoint, this.player)
         this.spawnShot(this.player.tryFireToward(this.aimPoint))
+      } else {
+        this.input.consumeFireClick()
       }
+      const friendlies = [this.player, ...this.allies.map((unit) => unit.tank)]
       for (const unit of this.force) {
-        this.spawnShot(unit.ai.update(dt, this.player, this.arena.obstacles, bodies))
+        const hunt = closestAlive(unit.tank, friendlies) ?? this.player
+        this.spawnShot(unit.ai.update(dt, hunt, this.arena.obstacles, bodies))
+      }
+      const hostiles = this.force.map((unit) => unit.tank)
+      for (const unit of this.allies) {
+        const hunt = closestAlive(unit.tank, hostiles) ?? this.player
+        this.spawnShot(unit.ai.update(dt, hunt, this.arena.obstacles, bodies))
       }
       this.advanceWave(dt)
     } else {
       this.audio.stopEngine()
       this.player?.applyAimPose()
       for (const unit of this.force) unit.tank.applyAimPose()
+      for (const unit of this.allies) unit.tank.applyAimPose()
     }
 
     this.player?.tickHitSway(dt)
     for (const unit of this.force) unit.tank.tickHitSway(dt)
+    for (const unit of this.allies) unit.tank.tickHitSway(dt)
+    this.workshop?.tick(dt)
     this.tracks.update(dt)
     this.fx.update(dt)
     this.updateProjectiles(dt)
@@ -250,6 +302,7 @@ export class Game {
         this.player.gunPitch,
         this.player.config.gunPitchMin,
         this.player.config.gunPitchMax,
+        this.workshop.contains(this.player.position.x, this.player.position.z),
       )
       this.checkRound()
     }
@@ -273,6 +326,7 @@ export class Game {
       } else {
         this.tryHit(shot, this.player)
         for (const unit of this.force) this.tryHit(shot, unit.tank)
+        for (const unit of this.allies) this.tryHit(shot, unit.tank)
       }
       if (!shot.alive) {
         shot.object.removeFromParent()
@@ -283,7 +337,7 @@ export class Game {
 
   private tryHit(shot: Projectile, tank: Tank): void {
     if (!shot.alive || !tank.alive || shot.ownerId === tank.id) return
-    if (shot.ownerId !== 'player' && tank.id !== 'player') return
+    if (shot.team === tank.team) return
     const p = shot.object.position
     if (p.y < tank.position.y - 0.2 || p.y > tank.position.y + tank.height + 0.4) return
     if (pointHitsObb(p.x, p.z, tank.position.x, tank.position.z, tank.hullYaw, tank.halfWidth, tank.halfLength)) {
@@ -296,7 +350,8 @@ export class Game {
         this.audio.explode()
         this.fx.explode(fxAt)
         this.fx.igniteWreck(tank.position, tank.height)
-        if (tank.id !== 'player') this.onEnemyKilled(tank)
+        if (tank.team === 'de') this.onEnemyKilled(tank)
+        else if (tank.id !== 'player') this.onAllyKilled(tank)
       }
       shot.alive = false
     }
@@ -315,7 +370,19 @@ export class Game {
     if (this.force.length === 0) {
       this.wavesCleared += 1
       this.spawnWait = 2.4
+      if (allyArrivesOnWaveClear(this.wavesCleared)) this.spawnAlly()
     }
+  }
+
+  private onAllyKilled(tank: Tank): void {
+    if (this.wrecks.length >= MAX_WRECKS) {
+      const oldest = this.wrecks.shift()
+      oldest?.object.removeFromParent()
+      this.fx.douseOldest()
+    }
+    this.wrecks.push(tank)
+    const idx = this.allies.findIndex((unit) => unit.tank === tank)
+    if (idx >= 0) this.allies.splice(idx, 1)
   }
 
   private advanceWave(dt: number): void {
@@ -347,16 +414,40 @@ export class Game {
     this.force.push({ tank, ai: new Bot(tank, slot, waveSize) })
   }
 
+  private spawnAlly(): void {
+    const yaw = PLAYER_SPAWN.yaw
+    const slot = this.allySeq
+    const side = slot % 2 === 0 ? 1 : -1
+    const x = PLAYER_SPAWN.x + Math.sin(yaw) * 5.5 + Math.cos(yaw) * side * (3.4 + slot * 0.4)
+    const z = PLAYER_SPAWN.z + Math.cos(yaw) * 5.5 - Math.sin(yaw) * side * (3.4 + slot * 0.4)
+    const tank = new Tank(
+      `ally-${this.allySeq}`,
+      this.playerTemplate.clone(true),
+      PLAYER_RIG,
+      new Vector3(x, 0, z),
+      yaw,
+      'pl',
+    )
+    this.allySeq += 1
+    tank.sitOnTerrain()
+    this.scene.add(tank.object)
+    this.allies.push({ tank, ai: new Bot(tank, slot, 2, 'ally') })
+    this.hud.flash('Karaluch z plutonu Orlika dołącza do osłony!')
+  }
+
   private clearEnemies(): void {
     for (const unit of this.force) unit.tank.object.removeFromParent()
+    for (const unit of this.allies) unit.tank.object.removeFromParent()
     for (const wreck of this.wrecks) wreck.object.removeFromParent()
     this.force.length = 0
+    this.allies.length = 0
     this.wrecks.length = 0
   }
 
   private allBodies(): Tank[] {
     const list: Tank[] = [this.player, ...this.wrecks]
     for (const unit of this.force) list.push(unit.tank)
+    for (const unit of this.allies) list.push(unit.tank)
     return list
   }
 
@@ -378,4 +469,18 @@ export class Game {
     this.renderer.setSize(width, height, false)
     this.cameraRig.resize(width, height)
   }
+}
+
+function closestAlive(from: Tank, candidates: Tank[]): Tank | null {
+  let best: Tank | null = null
+  let bestD = Infinity
+  for (const tank of candidates) {
+    if (!tank.alive || tank === from) continue
+    const d = Math.hypot(tank.position.x - from.position.x, tank.position.z - from.position.z)
+    if (d < bestD) {
+      best = tank
+      bestD = d
+    }
+  }
+  return best
 }

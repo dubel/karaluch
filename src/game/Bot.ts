@@ -7,7 +7,7 @@ import type { Projectile } from './Projectile'
 const _origin = new Vector3()
 const SEPARATION = 18
 
-/** Angular slots around the player (radians off the rear). Slot-based surround + boids separation. */
+/** Angular slots around the hunt target (radians off the rear). Slot-based surround + boids separation. */
 const SLOT_OFFSETS = [[0], [-0.72, 0.72], [-1.15, 0, 1.15]]
 
 export class Bot {
@@ -16,30 +16,33 @@ export class Bot {
   private readonly flankSign: number
   private readonly slotOffset: number
   private readonly ring: number
+  private readonly kind: 'axis' | 'ally'
 
   constructor(
     private readonly tank: Tank,
     slot: number,
     waveSize: number,
+    kind: 'axis' | 'ally' = 'axis',
   ) {
+    this.kind = kind
     const table = SLOT_OFFSETS[Math.min(Math.max(waveSize, 1), 3) - 1]
     this.slotOffset = table[slot % table.length]
     this.flankSign = this.slotOffset >= 0 ? 1 : -1
-    this.ring = waveSize === 1 ? 22 : 24 + Math.abs(this.slotOffset) * 7
+    this.ring = kind === 'ally' ? 16 + Math.abs(this.slotOffset) * 4 : waveSize === 1 ? 22 : 24 + Math.abs(this.slotOffset) * 7
   }
 
-  update(dt: number, player: Tank, obstacles: Aabb[], others: Tank[]): Projectile | null {
-    if (!this.tank.alive || !player.alive) return null
+  update(dt: number, hunt: Tank, obstacles: Aabb[], others: Tank[]): Projectile | null {
+    if (!this.tank.alive || !hunt.alive) return null
     this.bumpCool = Math.max(0, this.bumpCool - dt)
 
-    const px = player.position.x
-    const pz = player.position.z
+    const px = hunt.position.x
+    const pz = hunt.position.z
     const tx = this.tank.position.x
     const tz = this.tank.position.z
-    const distPlayer = Math.hypot(px - tx, pz - tz)
+    const distHunt = Math.hypot(px - tx, pz - tz)
     const distVillage = Math.hypot(tx, tz)
 
-    const { sepX, sepZ, crowded } = separate(tx, tz, this.tank, others)
+    const { sepX, sepZ, crowded } = separate(tx, tz, this.tank, others, this.kind)
     const speed = Math.hypot(this.tank.vx, this.tank.vz)
     const jammed = crowded && speed < 0.7
     if ((jammed || crowded) && this.bumpCool <= 0) {
@@ -48,15 +51,15 @@ export class Bot {
     }
 
     const shotSpeed = Math.max(this.tank.config.projectileSpeed, 1)
-    const lead = Math.min(0.85, distPlayer / shotSpeed)
-    const aimX = px + player.vx * lead
-    const aimZ = pz + player.vz * lead
-    const aimY = player.position.y + player.height * 0.38
+    const lead = Math.min(0.85, distHunt / shotSpeed)
+    const aimX = px + hunt.vx * lead
+    const aimZ = pz + hunt.vz * lead
+    const aimY = hunt.position.y + hunt.height * 0.38
 
-    const chase = distPlayer < 78 || distVillage < 34
+    const chase = this.kind === 'ally' || distHunt < 78 || distVillage < 34
     const rearPush = Math.min(1.45, this.bumps * 0.32)
     const offset = this.slotOffset + this.flankSign * rearPush
-    const around = player.hullYaw + Math.PI + offset
+    const around = hunt.hullYaw + Math.PI + offset
 
     let driveX: number
     let driveZ: number
@@ -103,16 +106,17 @@ export class Bot {
 
     this.tank.applyAimPose()
     this.tank.muzzle.getWorldPosition(_origin)
-    const playerYaw = Math.atan2(aimX - _origin.x, aimZ - _origin.z)
+    const huntYaw = Math.atan2(aimX - _origin.x, aimZ - _origin.z)
     const horiz = Math.hypot(aimX - _origin.x, aimZ - _origin.z)
     const pitch = Math.atan2(aimY - _origin.y, Math.max(horiz, 0.01))
-    this.tank.aimTowards(playerYaw, pitch, dt)
+    this.tank.aimTowards(huntYaw, pitch, dt)
     this.tank.applyAimPose()
     this.tank.tickCooldown(dt)
 
-    if (distPlayer < 8 || distPlayer > 86) return null
+    if (hunt.team === this.tank.team) return null
+    if (distHunt < 8 || distHunt > 86) return null
     if (!this.tank.aimedAt(aimX, aimY, aimZ, 0.045)) return null
-    return this.tank.tryFireToward(player.position)
+    return this.tank.tryFireToward(hunt.position)
   }
 }
 
@@ -121,12 +125,14 @@ function separate(
   tz: number,
   self: Tank,
   others: Tank[],
+  kind: 'axis' | 'ally',
 ): { sepX: number; sepZ: number; crowded: boolean } {
   let sepX = 0
   let sepZ = 0
   let crowded = false
   for (const other of others) {
-    if (other === self || !other.alive || other.id === 'player') continue
+    if (other === self || !other.alive) continue
+    if (kind === 'axis' && other.id === 'player') continue
     const dx = tx - other.position.x
     const dz = tz - other.position.z
     const d = Math.hypot(dx, dz)

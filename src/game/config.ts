@@ -91,7 +91,18 @@ export const FOLIAGE_URL = new URL('../../assets/low_poly_trees_flowers_and_gras
 export const GRASS_PATCH_URL = new URL('../../assets/grass_patches_-_circle.glb', import.meta.url).href
 export const ROAD_DIFF_URL = new URL('../../assets/textures/muddy_tracks_diff_2k.jpg', import.meta.url).href
 export const TREE_HEIGHT = 9.5
+export const TKS_LENGTH = 2.6
 export const PLAYER_SPAWN = { x: -96, z: 88, yaw: Math.PI * 0.72 }
+/** Depot just off the TKS start, in the spawn clearing (right of hull). */
+export const WORKSHOP = {
+  x: PLAYER_SPAWN.x + Math.cos(PLAYER_SPAWN.yaw) * 7.2,
+  z: PLAYER_SPAWN.z - Math.sin(PLAYER_SPAWN.yaw) * 7.2,
+  yaw: PLAYER_SPAWN.yaw + 0.4,
+}
+export const WORKSHOP_RADIUS = TKS_LENGTH * 2
+export const WORKSHOP_BARRELS_URL = new URL('../../assets/barrels_and_pallet.glb', import.meta.url).href
+export const WORKSHOP_WRENCH_URL = new URL('../../assets/monkey_wrench_low_poly.glb', import.meta.url).href
+export const WORKSHOP_HEAL_RATE = 0.01
 /** SE road past the village — opposite the TKS approach. */
 export const ENEMY_SPAWNS = [
   { x: 96, z: -80, yaw: Math.atan2(-96, 80) },
@@ -105,9 +116,15 @@ export function waveEnemyCount(waveIndex: number): number {
   return 1 + Math.floor(Math.random() * 3)
 }
 
+/** Ally TKS after waves 6, 9, then every 2: 11, 13, 15… */
+export function allyArrivesOnWaveClear(wavesCleared: number): boolean {
+  if (wavesCleared === 6 || wavesCleared === 9) return true
+  return wavesCleared > 9 && (wavesCleared - 9) % 2 === 0
+}
+
 export const PLAYER_RIG: RigConfig = {
   url: playerUrl,
-  targetLength: 2.6,
+  targetLength: TKS_LENGTH,
   turretNames: ['GunShield_low.001', '20MM_low'],
   gunNames: ['GunShield_low.001', '20MM_low'],
   turretYawLimit: 0,

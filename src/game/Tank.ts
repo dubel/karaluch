@@ -1,7 +1,9 @@
 import {
   Color,
+  ConeGeometry,
   Group,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
   Vector3,
@@ -15,6 +17,23 @@ import { terrainHeight } from './terrain'
 const _forward = new Vector3()
 const _muzzle = new Vector3()
 const _dir = new Vector3()
+
+const BEACON_GEO = new ConeGeometry(0.38, 1.05, 4)
+BEACON_GEO.rotateX(Math.PI)
+const BEACON_ENEMY = new MeshBasicMaterial({
+  color: 0xff2d24,
+  transparent: true,
+  opacity: 0.92,
+  depthWrite: false,
+  toneMapped: false,
+})
+const BEACON_ALLY = new MeshBasicMaterial({
+  color: 0x3ee86a,
+  transparent: true,
+  opacity: 0.92,
+  depthWrite: false,
+  toneMapped: false,
+})
 
 function wrapPi(angle: number): number {
   let a = angle
@@ -44,6 +63,8 @@ export class Tank {
   readonly halfWidth: number
   readonly halfLength: number
   readonly height: number
+  readonly trackOffset: number
+  readonly trackWidth: number
 
   hullYaw = 0
   turretYaw = 0
@@ -61,6 +82,8 @@ export class Tank {
   private hitRollVel = 0
   private terrainPitch = 0
   private terrainRoll = 0
+  private beacon: Mesh | null = null
+  private beaconT = 0
 
   constructor(
     id: string,
@@ -81,6 +104,8 @@ export class Tank {
     this.halfWidth = rig.halfWidth
     this.halfLength = rig.halfLength
     this.height = rig.height
+    this.trackOffset = config.trackOffset ?? this.halfWidth * 0.84
+    this.trackWidth = config.trackWidth ?? Math.max(this.halfWidth * 0.26, 0.14)
     this.hp = config.maxHp
     this.spawn.copy(spawn)
     this.spawnYaw = spawnYaw
@@ -99,6 +124,7 @@ export class Tank {
         if (mat instanceof MeshStandardMaterial) this.dimMaterials.push(mat)
       }
     })
+    if (id !== 'player') this.attachBeacon()
   }
 
   get position(): Vector3 {
@@ -171,6 +197,29 @@ export class Tank {
     this.hitRollVel *= Math.exp(-5.5 * dt)
     this.hitRoll += this.hitRollVel * dt
     this.applyHullPose()
+    this.tickBeacon(dt)
+  }
+
+  private attachBeacon(): void {
+    const mesh = new Mesh(BEACON_GEO, this.team === 'pl' ? BEACON_ALLY : BEACON_ENEMY)
+    mesh.castShadow = false
+    mesh.receiveShadow = false
+    mesh.frustumCulled = false
+    mesh.renderOrder = 6
+    this.beacon = mesh
+    this.object.add(mesh)
+    this.tickBeacon(0)
+  }
+
+  private tickBeacon(dt: number): void {
+    if (!this.beacon) return
+    this.beacon.visible = this.alive
+    if (!this.alive) return
+    this.beaconT += dt
+    const t = this.beaconT
+    const pulse = 0.5 + 0.5 * Math.sin(t * 2.6)
+    this.beacon.position.y = this.height + 1.12 + Math.sin(t * 1.7) * 0.18
+    this.beacon.scale.setScalar(0.88 + pulse * 0.22)
   }
 
   drive(

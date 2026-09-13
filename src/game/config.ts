@@ -17,6 +17,10 @@ export type RigConfig = {
   cameraDistance: number
   /** Extra yaw applied to the mesh so model forward matches hull +Z. */
   visualYaw?: number
+  /** Lateral distance from hull center to the middle of a track. */
+  trackOffset?: number
+  /** Ground-mark width matching one caterpillar. */
+  trackWidth?: number
 }
 
 const playerUrl = new URL('../../assets/tks_20mm_tankette.glb', import.meta.url).href
@@ -143,6 +147,8 @@ export const PLAYER_RIG: RigConfig = {
   damage: 1,
   projectileSpeed: 72,
   cameraDistance: 11,
+  trackOffset: 0.63,
+  trackWidth: 0.2,
 }
 
 export const BOT_RIG: RigConfig = {
@@ -171,6 +177,8 @@ export const BOT_RIG: RigConfig = {
   projectileSpeed: 78,
   cameraDistance: 14,
   visualYaw: Math.PI / 2,
+  trackOffset: 1.12,
+  trackWidth: 0.38,
 }
 
 function parseFlag(value: string | null): boolean {

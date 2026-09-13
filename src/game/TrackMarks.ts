@@ -92,8 +92,8 @@ export class TrackMarks {
       if (moved < SPACING && Math.abs(dyaw) < 0.09) return
     }
     this.last.set(tank.id, { x, z, yaw })
-    const side = Math.max(tank.halfWidth * 0.72, 0.48)
-    const width = Math.max(tank.halfWidth * 0.24, 0.12)
+    const side = tank.trackOffset
+    const width = tank.trackWidth
     this.place(x + cos * side, z - sin * side, yaw, width)
     this.place(x - cos * side, z + sin * side, yaw, width)
   }

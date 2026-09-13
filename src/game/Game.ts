@@ -198,6 +198,9 @@ export class Game {
       this.arena.tick(dt, this.cameraRig.camera, this.player.position)
       this.hud.setAtmosphere(this.arena.atmosphere.label)
       this.audio.setWeather(this.arena.atmosphere.rain, this.arena.atmosphere.wind)
+      this.audio.tickAmbience(dt, this.arena.atmosphere.clockHour, this.arena.atmosphere.rain)
+      const thunder = this.arena.atmosphere.consumeThunder()
+      if (thunder) this.audio.thunder(thunder)
       this.hud.update(
         this.player.hp,
         this.player.config.maxHp,

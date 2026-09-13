@@ -41,11 +41,11 @@ type WeatherSample = {
 }
 
 const WEATHER: Record<WeatherId, WeatherSpec> = {
-  clear: { cover: [0.02, 0.2], rain: [0, 0], wind: [0.2, 0.62], dark: [0, 0.08], label: 'bezchmurnie', weight: 24 },
-  clouds: { cover: [0.26, 0.6], rain: [0, 0.04], wind: [0.38, 0.9], dark: [0.04, 0.2], label: 'zachmurzenie', weight: 32 },
-  overcast: { cover: [0.62, 0.88], rain: [0, 0.14], wind: [0.5, 1.05], dark: [0.22, 0.46], label: 'pochmurno', weight: 18 },
-  rain: { cover: [0.78, 0.96], rain: [0.42, 0.88], wind: [0.85, 1.45], dark: [0.38, 0.58], label: 'deszcz', weight: 16 },
-  storm: { cover: [0.9, 1], rain: [0.82, 1], wind: [1.45, 2.15], dark: [0.55, 0.78], label: 'ulewa', weight: 6 },
+  clear: { cover: [0.02, 0.2], rain: [0, 0], wind: [0.2, 0.62], dark: [0, 0.08], label: 'bezchmurnie', weight: 44 },
+  clouds: { cover: [0.26, 0.6], rain: [0, 0.04], wind: [0.38, 0.9], dark: [0.04, 0.2], label: 'zachmurzenie', weight: 30 },
+  overcast: { cover: [0.62, 0.88], rain: [0, 0.14], wind: [0.5, 1.05], dark: [0.22, 0.46], label: 'pochmurno', weight: 14 },
+  rain: { cover: [0.78, 0.96], rain: [0.42, 0.88], wind: [0.85, 1.45], dark: [0.38, 0.58], label: 'deszcz', weight: 8 },
+  storm: { cover: [0.9, 1], rain: [0.82, 1], wind: [1.45, 2.15], dark: [0.55, 0.78], label: 'burza', weight: 4 },
 }
 
 const IDS = Object.keys(WEATHER) as WeatherId[]
@@ -84,16 +84,36 @@ function wrapHour(hour: number): number {
   return ((hour % 24) + 24) % 24
 }
 
-function parseQuery(): { hour: number; weather: WeatherId | null; freeze: boolean; mist: number | null } {
+function flagOn(v: string | null): boolean {
+  if (!v) return false
+  const n = v.trim().toLowerCase()
+  return n === '1' || n === 'true' || n === 'yes'
+}
+
+function parseQuery(): {
+  hour: number
+  weather: WeatherId | null
+  freeze: boolean
+  mist: number | null
+  lockWeather: boolean
+  lockMist: boolean
+} {
   const q = new URLSearchParams(window.location.search)
   const rawHour = Number(q.get('hour'))
+  const hourSet = q.has('hour') && Number.isFinite(rawHour)
   const weather = q.get('weather') as WeatherId | null
+  const weatherSet = Boolean(weather && weather in WEATHER)
   const mistRaw = q.get('mist')
+  const mist =
+    flagOn(mistRaw) ? 1 : mistRaw === '0' || mistRaw?.toLowerCase() === 'false' ? 0 : null
+  const fixed = flagOn(q.get('fixed'))
   return {
-    hour: Number.isFinite(rawHour) ? wrapHour(rawHour) : 17.15,
-    weather: weather && weather in WEATHER ? weather : null,
-    freeze: q.get('pauseday') === '1',
-    mist: mistRaw === '1' ? 1 : mistRaw === '0' ? 0 : null,
+    hour: hourSet ? wrapHour(rawHour) : 8,
+    weather: weatherSet ? weather : null,
+    freeze: flagOn(q.get('pauseday')) || (fixed && hourSet),
+    mist,
+    lockWeather: fixed && weatherSet,
+    lockMist: fixed && mist !== null,
   }
 }
 
@@ -127,7 +147,7 @@ function rollWeather(exclude: WeatherId | null, forced?: WeatherId): WeatherSamp
 
 function weatherLabel(id: WeatherId, rain: number, mist: number): string {
   const foggy = mist > 0.42
-  if (foggy && rain > 0.45) return id === 'storm' ? 'ulewa i mgła' : 'deszcz i mgła'
+  if (foggy && rain > 0.45) return id === 'storm' ? 'burza i mgła' : 'deszcz i mgła'
   if (foggy) return 'mgła'
   return WEATHER[id].label
 }
@@ -156,7 +176,7 @@ export class Atmosphere {
   private readonly windClock: WindClock
   private readonly freeze: boolean
   private readonly lockWeather: boolean
-  private readonly lockMist: number | null
+  private readonly lockMist: boolean
   private readonly fog: FogExp2
   private readonly hemi: HemisphereLight
   private readonly sun: DirectionalLight
@@ -178,7 +198,21 @@ export class Atmosphere {
   private mistCd = 18
   private flash = 0
   private flashCd = 4
+  private flashFollow = 0
   private time = 0
+  private thunderWait = 0
+  private thunderEvent: { volume: number; far: boolean } | null = null
+  private readonly flashDir = new Vector3(1, 0.08, 0)
+
+  get clockHour(): number {
+    return this.hour
+  }
+
+  consumeThunder(): { volume: number; far: boolean } | null {
+    const event = this.thunderEvent
+    this.thunderEvent = null
+    return event
+  }
 
   constructor(scene: Scene, wind: WindClock) {
     this.scene = scene
@@ -186,16 +220,17 @@ export class Atmosphere {
     const boot = parseQuery()
     this.hour = boot.hour
     this.freeze = boot.freeze
-    this.lockWeather = Boolean(boot.weather)
-    this.lockMist = boot.mist
+    this.lockWeather = boot.lockWeather
+    this.lockMist = boot.lockMist
     this.from = rollWeather(null, boot.weather ?? undefined)
     this.to = this.from
     this.hold = 10 + Math.random() * 22
     this.mistCd = 14 + Math.random() * 28
-    if (this.lockMist === 1) {
-      this.mist = 1
-      this.mistGoal = 1
-      this.mistPhase = 'hold'
+    if (boot.mist !== null) {
+      this.mist = boot.mist
+      this.mistGoal = boot.mist
+      this.mistPhase = boot.mist > 0.2 ? 'hold' : 'idle'
+      this.mistTimer = 14 + Math.random() * 20
     }
 
     scene.background = new Color(0x6b7c8a)
@@ -261,7 +296,7 @@ export class Atmosphere {
     this.windClock.dirX.value = Math.cos(ang)
     this.windClock.dirZ.value = Math.sin(ang)
 
-    this.stepLightning(dt, rain, wind)
+    this.stepLightning(dt, rain, wind, weatherId)
 
     const sunAlt = bodyDir(this.hour, SUN_DEC, _sunDir)
     const moonAlt = bodyDir(this.hour + 13.2, MOON_DEC, _moonDir)
@@ -273,7 +308,7 @@ export class Atmosphere {
     paintSky(sunAlt, night, golden, twilight, cover, dark, this.flash, this.mist)
     const occ = cover * (0.5 + 0.25 * (0.5 + 0.5 * Math.sin(this.time * 0.17)))
     const sunLit =
-      smooth(-0.12, 0.1, sunAlt) * (1 - occ * 0.72) * (1 - dark * 0.18) * (1 - this.mist * 0.5)
+      smooth(-0.12, 0.1, sunAlt) * (1 - occ * 0.72) * (1 - dark * 0.18) * (1 - this.mist * 0.28)
     const moonLit = smooth(-0.04, 0.14, moonAlt) * night * (0.45 + 0.55 * (1 - cover * 0.5))
 
     this.sun.color.copy(_sunCol)
@@ -297,7 +332,7 @@ export class Atmosphere {
     this.fog.color.copy(_fog)
     this.scene.background = this.fog.color
     const fogPull = 0.28 + cover * 0.2 + rain * 0.3 + night * 0.1
-    this.fog.density = 0.0017 + fogPull * 0.0042 + this.mist * 0.016
+    this.fog.density = 0.0016 + fogPull * 0.0038 + this.mist * 0.0085
 
     this.sky.position.copy(camera.position)
     const u = this.skyMat.uniforms
@@ -313,6 +348,8 @@ export class Atmosphere {
     u.uNight.value = night
     u.uTime.value = this.time
     u.uFlash.value = this.flash
+    u.uFlashDir.value.copy(this.flashDir)
+    u.uMist.value = this.mist
     u.uWind.value.set(this.windClock.dirX.value, 0, this.windClock.dirZ.value)
     u.uMoonGlow.value = moonLit
 
@@ -358,8 +395,7 @@ export class Atmosphere {
   }
 
   private stepMist(dt: number, hour: number, rain: number): void {
-    if (this.lockMist !== null) {
-      this.mist += (this.lockMist - this.mist) * Math.min(1, dt * 1.2)
+    if (this.lockMist) {
       return
     }
     if (this.mistPhase === 'idle') {
@@ -402,15 +438,33 @@ export class Atmosphere {
     this.mistCd = 22 + Math.random() * 48
   }
 
-  private stepLightning(dt: number, rain: number, wind: number): void {
-    this.flash *= Math.exp(-dt * 7.5)
+  private stepLightning(dt: number, rain: number, wind: number, id: WeatherId): void {
+    this.flash *= Math.exp(-dt * 5.8)
     this.flashCd -= dt
-    const stormy = rain > 0.82 && wind > 1.3
-    if (!stormy || this.flashCd > 0) return
-    if (Math.random() < 1 - Math.exp(-dt * 0.18)) {
-      this.flash = 0.55 + Math.random() * 0.7
-      this.flashCd = 3 + Math.random() * 9
+    if (this.flashFollow > 0) {
+      this.flashFollow -= dt
+      if (this.flashFollow <= 0) this.flash = Math.max(this.flash, 0.35 + Math.random() * 0.45)
     }
+    if (this.thunderWait > 0) {
+      this.thunderWait -= dt
+      if (this.thunderWait <= 0) {
+        this.thunderEvent = {
+          volume: 0.32 + Math.random() * 0.5,
+          far: rain < 0.85 || wind < 1.4,
+        }
+      }
+    }
+    const stormy = id === 'storm' || (rain > 0.7 && wind > 1.05)
+    const rainy = rain > 0.48
+    if ((!stormy && !rainy) || this.flashCd > 0) return
+    const rate = stormy ? 0.28 : 0.07
+    if (Math.random() >= 1 - Math.exp(-dt * rate)) return
+    const az = Math.random() * Math.PI * 2
+    this.flashDir.set(Math.sin(az), 0.04 + Math.random() * 0.1, Math.cos(az)).normalize()
+    this.flash = stormy ? 0.7 + Math.random() * 0.7 : 0.35 + Math.random() * 0.4
+    this.flashFollow = 0.06 + Math.random() * 0.1
+    this.flashCd = stormy ? 2.4 + Math.random() * 7 : 8 + Math.random() * 16
+    this.thunderWait = 0.35 + Math.random() * (stormy ? 1.8 : 2.8)
   }
 }
 
@@ -467,16 +521,17 @@ function paintSky(
   _horizon.multiplyScalar(1 - dark * 0.28)
 
   _tmp.set(0xdce8ff)
-  _zenith.lerp(_tmp, flash * 0.65)
-  _horizon.lerp(_tmp, flash * 0.45)
+  _zenith.lerp(_tmp, flash * 0.12)
+  _horizon.lerp(_tmp, flash * 0.28)
 
   _hemiSky.copy(_horizon).lerp(_zenith, 0.35)
   _hemiGround.set(0x4a4030).lerp(_tmp.set(0x14161c), night)
-  _tmp.set(night > 0.45 ? 0x1a2230 : 0x6a7682)
-  _horizon.lerp(_tmp, mist * 0.5)
-  _zenith.lerp(_horizon, mist * 0.35)
-  _fog.copy(_horizon).lerp(_zenith, 0.18)
-  _ground.copy(_horizon).multiplyScalar(0.55)
+  _tmp.set(night > 0.45 ? 0x1c2430 : 0x5a6570)
+  _fog.copy(_horizon).lerp(_tmp, mist)
+  _horizon.lerp(_fog, mist * 0.8)
+  _zenith.lerp(_fog, mist * 0.2)
+  _fog.copy(_horizon)
+  _ground.copy(_horizon).multiplyScalar(0.62)
 }
 
 function makeSkyMaterial(): ShaderMaterial {
@@ -500,6 +555,8 @@ function makeSkyMaterial(): ShaderMaterial {
       uNight: { value: 0 },
       uTime: { value: 0 },
       uFlash: { value: 0 },
+      uFlashDir: { value: new Vector3(1, 0.08, 0) },
+      uMist: { value: 0 },
       uMoonGlow: { value: 0 },
       uWind: { value: new Vector3(1, 0, 0) },
     },
@@ -525,6 +582,8 @@ uniform float uStorm;
 uniform float uNight;
 uniform float uTime;
 uniform float uFlash;
+uniform vec3 uFlashDir;
+uniform float uMist;
 uniform float uMoonGlow;
 uniform vec3 uWind;
 
@@ -595,8 +654,12 @@ void main() {
   cloudCol += uMoonColor * uMoonGlow * 0.12;
   cloudCol += uSunColor * mie * 0.15;
   col = mix(col, cloudCol, clouds * mix(0.72, 0.94, uCloudCover));
+  col = mix(col, uHorizon, uMist * (1.0 - smoothstep(0.0, 0.22, h)) * 0.55);
 
-  col += uFlash * vec3(0.55, 0.62, 0.75);
+  vec3 flashAim = normalize(uFlashDir);
+  float cone = pow(max(dot(dir, flashAim), 0.0), 14.0);
+  float band = exp(-pow((h - 0.03) / 0.11, 2.0));
+  col += uFlash * vec3(0.82, 0.88, 1.0) * (cone * 2.1 + band * 0.42);
   gl_FragColor = vec4(col, 1.0);
 }
 `,

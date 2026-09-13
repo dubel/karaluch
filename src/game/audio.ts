@@ -1,6 +1,10 @@
 const ENGINE_URL = new URL('../../assets/sfx/engine_loop.ogg', import.meta.url).href
 const CANNON_URL = new URL('../../assets/sfx/cannon_fire.ogg', import.meta.url).href
 const EXPLODE_URL = new URL('../../assets/sfx/mechanical_explosion.wav', import.meta.url).href
+const RAIN_URL = new URL('../../assets/sfx/rain_loop.ogg', import.meta.url).href
+const THUNDER_NEAR_URL = new URL('../../assets/sfx/thunder_near.ogg', import.meta.url).href
+const THUNDER_FAR_URL = new URL('../../assets/sfx/thunder_far.ogg', import.meta.url).href
+const BIRD_URL = new URL('../../assets/sfx/bird_robin.ogg', import.meta.url).href
 
 export class GameAudio {
   private ctx: AudioContext | null = null
@@ -13,6 +17,7 @@ export class GameAudio {
   private engineVol = 0
   private rainGain: GainNode | null = null
   private windGain: GainNode | null = null
+  private birdCd = 2
   private ready = false
 
   async load(): Promise<void> {
@@ -20,6 +25,10 @@ export class GameAudio {
       ['engine', ENGINE_URL],
       ['cannon', CANNON_URL],
       ['explode', EXPLODE_URL],
+      ['rain', RAIN_URL],
+      ['thunderNear', THUNDER_NEAR_URL],
+      ['thunderFar', THUNDER_FAR_URL],
+      ['bird', BIRD_URL],
     ] as const
     await Promise.all(
       jobs.map(async ([name, url]) => {
@@ -80,8 +89,22 @@ export class GameAudio {
   setWeather(rain: number, wind: number): void {
     if (!this.ctx || !this.rainGain || !this.windGain) return
     const t = this.ctx.currentTime
-    this.rainGain.gain.setTargetAtTime(Math.max(0, rain) * 0.2, t, 0.35)
+    this.rainGain.gain.setTargetAtTime(Math.max(0, rain) * 0.34, t, 0.4)
     this.windGain.gain.setTargetAtTime(Math.max(0, wind) * 0.07, t, 0.4)
+  }
+
+  thunder(event: { volume: number; far: boolean }): void {
+    this.play(event.far ? 'thunderFar' : 'thunderNear', event.volume, 0.88 + Math.random() * 0.2)
+  }
+
+  tickAmbience(dt: number, hour: number, rain: number): void {
+    if (!this.ready) return
+    this.birdCd -= dt
+    const morning = hour >= 5.4 && hour < 11.2
+    if (!morning || rain > 0.38 || this.birdCd > 0) return
+    if (Math.random() >= 1 - Math.exp(-dt * 0.22)) return
+    this.play('bird', 0.14 + Math.random() * 0.16, 0.88 + Math.random() * 0.28)
+    this.birdCd = 2.8 + Math.random() * 8.5
   }
 
   private startEngine(): void {
@@ -108,8 +131,9 @@ export class GameAudio {
   private startWeatherPads(): void {
     const ctx = this.ctx
     if (!ctx || !this.master) return
-    this.rainGain = loopPad(ctx, this.master, makeRainBuffer(ctx), 0, 1.04)
-    this.windGain = loopPad(ctx, this.master, makeWindBuffer(ctx), 0, 0.92)
+    const rainBuf = this.decoded.get('rain') ?? makeRainBuffer(ctx)
+    this.rainGain = loopPad(ctx, this.master, rainBuf, 0, 1, 7200)
+    this.windGain = loopPad(ctx, this.master, makeWindBuffer(ctx), 0, 0.92, 760)
   }
 
   private play(name: string, volume: number, rate: number): void {
@@ -133,6 +157,7 @@ function loopPad(
   buf: AudioBuffer,
   volume: number,
   rate: number,
+  cutoff: number,
 ): GainNode {
   const src = ctx.createBufferSource()
   src.buffer = buf
@@ -140,7 +165,7 @@ function loopPad(
   src.playbackRate.value = rate
   const filter = ctx.createBiquadFilter()
   filter.type = 'lowpass'
-  filter.frequency.value = rate > 1 ? 4200 : 760
+  filter.frequency.value = cutoff
   const gain = ctx.createGain()
   gain.gain.value = volume
   src.connect(filter)

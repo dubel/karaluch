@@ -20,6 +20,7 @@ import {
   FOLIAGE_URL,
   GRASS_PATCH_URL,
   HOUSE_URL,
+  KID_MODE,
   PERIMETER_URL,
   PLAYER_RIG,
   PLAYER_SPAWN,
@@ -46,6 +47,8 @@ import { releaseIntroMusic } from '../ui/intro'
 import { formatHeldTime, type Hud } from '../ui/hud'
 
 type CombatUnit = { tank: Tank; ai: Bot }
+
+const _kidAim = new Vector3()
 
 export class Game {
   private readonly renderer: WebGLRenderer
@@ -266,7 +269,9 @@ export class Game {
         (this.input.consumeFireClick() || (this.input.fireHeld && this.player.cooldown <= 0))
       ) {
         this.cameraRig.getAimPoint(this.aimPoint, this.player)
-        this.spawnShot(this.player.tryFireToward(this.aimPoint))
+        const shot = this.player.tryFireToward(this.aimPoint)
+        if (shot && KID_MODE) this.snapPlayerShot(shot)
+        this.spawnShot(shot)
       } else {
         this.input.consumeFireClick()
       }
@@ -330,6 +335,42 @@ export class Game {
     this.scene.add(shot.object)
     this.audio.fire()
     this.fx.muzzle(shot.object.position)
+  }
+
+  /** Kid mode: if the crosshair is roughly on an enemy, the tracer flies at the hull. */
+  private snapPlayerShot(shot: Projectile): void {
+    const origin = shot.object.position
+    const speed = shot.velocity.length()
+    if (speed < 1e-4) return
+    const dx = shot.velocity.x / speed
+    const dy = shot.velocity.y / speed
+    const dz = shot.velocity.z / speed
+    let best: Tank | null = null
+    let bestDot = Math.cos(0.22)
+    for (const unit of this.force) {
+      const tank = unit.tank
+      if (!tank.alive) continue
+      _kidAim.set(
+        tank.position.x - origin.x,
+        tank.position.y + tank.height * 0.42 - origin.y,
+        tank.position.z - origin.z,
+      )
+      const len = _kidAim.length()
+      if (len < 3 || len > 94) continue
+      const inv = 1 / len
+      const dot = dx * _kidAim.x * inv + dy * _kidAim.y * inv + dz * _kidAim.z * inv
+      if (dot > bestDot) {
+        bestDot = dot
+        best = tank
+      }
+    }
+    if (!best) return
+    shot.velocity.set(
+      best.position.x - origin.x,
+      best.position.y + best.height * 0.42 - origin.y,
+      best.position.z - origin.z,
+    )
+    shot.velocity.setLength(speed)
   }
 
   private artilleryCharge(): number {
@@ -422,8 +463,9 @@ export class Game {
     if (!shot.alive || !tank.alive || shot.ownerId === tank.id) return
     if (shot.team === tank.team) return
     const p = shot.object.position
-    if (p.y < tank.position.y - 0.2 || p.y > tank.position.y + tank.height + 0.4) return
-    if (pointHitsObb(p.x, p.z, tank.position.x, tank.position.z, tank.hullYaw, tank.halfWidth, tank.halfLength)) {
+    const kidPad = KID_MODE && shot.ownerId === 'player' ? 1.28 : 1
+    if (p.y < tank.position.y - 0.2 || p.y > tank.position.y + tank.height + 0.4 * kidPad) return
+    if (pointHitsObb(p.x, p.z, tank.position.x, tank.position.z, tank.hullYaw, tank.halfWidth * kidPad, tank.halfLength * kidPad)) {
       const killed = tank.takeDamage(shot.damage)
       const fxAt = tank.position.clone()
       fxAt.y += tank.height * 0.55

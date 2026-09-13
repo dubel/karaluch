@@ -3,9 +3,9 @@ import {
   ConeGeometry,
   Group,
   Mesh,
-  MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
+  Quaternion,
   Vector3,
 } from 'three'
 import type { RigConfig } from './config'
@@ -18,22 +18,27 @@ const _forward = new Vector3()
 const _muzzle = new Vector3()
 const _dir = new Vector3()
 
-const BEACON_GEO = new ConeGeometry(0.38, 1.05, 4)
+const BEACON_GEO = new ConeGeometry(0.48, 1.32, 24)
 BEACON_GEO.rotateX(Math.PI)
-const BEACON_ENEMY = new MeshBasicMaterial({
+const BEACON_ENEMY = new MeshStandardMaterial({
   color: 0xff2d24,
+  emissive: 0xc41810,
+  emissiveIntensity: 0.85,
+  roughness: 0.38,
+  metalness: 0.08,
   transparent: true,
-  opacity: 0.92,
-  depthWrite: false,
-  toneMapped: false,
+  opacity: 0.94,
 })
-const BEACON_ALLY = new MeshBasicMaterial({
+const BEACON_ALLY = new MeshStandardMaterial({
   color: 0x3ee86a,
+  emissive: 0x148a38,
+  emissiveIntensity: 0.85,
+  roughness: 0.38,
+  metalness: 0.08,
   transparent: true,
-  opacity: 0.92,
-  depthWrite: false,
-  toneMapped: false,
+  opacity: 0.94,
 })
+const _beaconWorld = new Quaternion()
 
 function wrapPi(angle: number): number {
   let a = angle
@@ -173,6 +178,7 @@ export class Tank {
       this.alive = false
       this.nudgeHit()
       this.object.visible = true
+      this.dropBeacon()
       for (const mat of this.dimMaterials) {
         if (!mat.userData.baseColor) {
           mat.userData.baseColor = mat.color.clone()
@@ -211,15 +217,25 @@ export class Tank {
     this.tickBeacon(0)
   }
 
+  private dropBeacon(): void {
+    if (!this.beacon) return
+    this.beacon.removeFromParent()
+    this.beacon = null
+  }
+
   private tickBeacon(dt: number): void {
     if (!this.beacon) return
-    this.beacon.visible = this.alive
-    if (!this.alive) return
+    if (!this.alive) {
+      this.dropBeacon()
+      return
+    }
     this.beaconT += dt
     const t = this.beaconT
-    const pulse = 0.5 + 0.5 * Math.sin(t * 2.6)
-    this.beacon.position.y = this.height + 1.12 + Math.sin(t * 1.7) * 0.18
-    this.beacon.scale.setScalar(0.88 + pulse * 0.22)
+    const pulse = 0.5 + 0.5 * Math.sin(t * 2.35)
+    this.beacon.position.y = this.height + 1.18 + Math.sin(t * 2.05) * 0.34
+    this.beacon.scale.setScalar(0.94 + pulse * 0.14)
+    this.object.getWorldQuaternion(_beaconWorld)
+    this.beacon.quaternion.copy(_beaconWorld).invert()
   }
 
   drive(

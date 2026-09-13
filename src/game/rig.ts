@@ -28,7 +28,7 @@ export function stripJunk(root: Object3D): void {
       remove.push(obj)
       return
     }
-    if (/^(Area|Camera)(\.|$)/i.test(obj.name)) {
+    if (/^(Area|Camera|Light)(\.|$)/i.test(obj.name)) {
       remove.push(obj)
     }
   })

@@ -24,8 +24,67 @@ export const HOUSE_URL = new URL(
   import.meta.url,
 ).href
 export const HOUSE_TARGET_LENGTH = 14
+
+export type VillageProp = {
+  url: string
+  length: number
+  x: number
+  z: number
+  yaw: number
+  /** Half-extent of the drive-blocking box; keeps photogrammetry dirt from becoming a no-go zone. */
+  collideHx: number
+  collideHz: number
+  spinSails?: boolean
+}
+
+export const WELL_PROP: VillageProp = {
+  url: new URL('../../assets/old_village_well.glb', import.meta.url).href,
+  length: 2.35,
+  x: -9,
+  z: 6.5,
+  yaw: 0.18,
+  collideHx: 1.15,
+  collideHz: 1.15,
+}
+
+export const CART_PROP: VillageProp = {
+  url: new URL('../../assets/old_cart_with_a_qvevri_clay_vessel_-_raw_scan.glb', import.meta.url).href,
+  length: 3.3,
+  x: -13.5,
+  z: -3.5,
+  yaw: 1.05,
+  collideHx: 1.7,
+  collideHz: 1.05,
+}
+
+export const WAGON_PROP: VillageProp = {
+  url: new URL('../../assets/old_wooden_wagon.glb', import.meta.url).href,
+  length: 3.7,
+  x: -4.5,
+  z: -9,
+  yaw: -0.55,
+  collideHx: 1.95,
+  collideHz: 1.05,
+}
+
+export const WINDMILL_PROP: VillageProp = {
+  url: new URL('../../assets/windmill_in_soviet_village.glb', import.meta.url).href,
+  length: 13,
+  x: -58,
+  z: 48,
+  yaw: 0.62,
+  collideHx: 3.5,
+  collideHz: 3.5,
+  spinSails: true,
+}
+
+export const VILLAGE_PROPS: VillageProp[] = [WELL_PROP, CART_PROP, WAGON_PROP, WINDMILL_PROP]
 /** Playable half-extent; 168/84 doubles the side and quadruples the surface again. */
 export const ARENA_HALF = 168
+export const PERIMETER_URL = new URL(
+  '../../assets/hedgehog_tank_trap_and_barbed_wire_obstacles.glb',
+  import.meta.url,
+).href
 export const FOLIAGE_URL = new URL('../../assets/low_poly_trees_flowers_and_grass.glb', import.meta.url).href
 export const GRASS_PATCH_URL = new URL('../../assets/grass_patches_-_circle.glb', import.meta.url).href
 export const ROAD_DIFF_URL = new URL('../../assets/textures/muddy_tracks_diff_2k.jpg', import.meta.url).href

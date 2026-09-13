@@ -10,6 +10,8 @@ export class Input {
   private readonly canvas: HTMLCanvasElement
   private mouseFire = false
   private spaceFire = false
+  private armed = false
+  private suppressFireUntil = 0
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -23,6 +25,20 @@ export class Input {
 
   lockPointer(): void {
     void this.canvas.requestPointerLock()
+  }
+
+  /** Drop leftover clicks/keys from overlay and intro so entering the arena does not fire. */
+  arm(): void {
+    this.armed = true
+    this.suppressFireUntil = performance.now() + 280
+    this.fireClicked = false
+    this.fireHeld = false
+    this.mouseFire = false
+    this.spaceFire = false
+  }
+
+  private canFire(): boolean {
+    return this.armed && performance.now() >= this.suppressFireUntil
   }
 
   consumeMouse(): { dx: number; dy: number } {
@@ -75,12 +91,13 @@ export class Input {
     ) {
       event.preventDefault()
     }
+    this.keys.add(event.code)
+    if (event.repeat || !this.canFire()) return
     if (event.code === 'Space') {
-      if (!this.keys.has('Space')) this.fireClicked = true
+      this.fireClicked = true
       this.spaceFire = true
       this.fireHeld = true
     }
-    this.keys.add(event.code)
     if (event.code === 'KeyR') this.restart = true
   }
 
@@ -99,7 +116,7 @@ export class Input {
   }
 
   private onMouseDown = (event: MouseEvent): void => {
-    if (event.button !== 0) return
+    if (event.button !== 0 || !this.canFire() || !this.pointerLocked) return
     this.mouseFire = true
     this.fireHeld = true
     this.fireClicked = true

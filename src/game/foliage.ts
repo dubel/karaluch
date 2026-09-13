@@ -13,7 +13,7 @@ import {
 } from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { Aabb } from './collision'
-import { ARENA_HALF, BOT_SPAWN, PLAYER_SPAWN, TREE_HEIGHT } from './config'
+import { ARENA_HALF, BOT_SPAWN, PLAYER_SPAWN, TREE_HEIGHT, WINDMILL_PROP } from './config'
 import { roadDistance } from './road'
 import { stripJunk } from './rig'
 import { terrainHeight } from './terrain'
@@ -307,6 +307,7 @@ function scatter(
       const pz = z + (rng() - 0.5) * cell * 0.86
       if (Math.max(Math.abs(px), Math.abs(pz)) > limit) continue
       if (Math.hypot(px, pz) < opts.house) continue
+      if (Math.hypot(px - WINDMILL_PROP.x, pz - WINDMILL_PROP.z) < Math.max(8, opts.house * 0.7)) continue
       if (Math.hypot(px - PLAYER_SPAWN.x, pz - PLAYER_SPAWN.z) < opts.spawn) continue
       if (Math.hypot(px - BOT_SPAWN.x, pz - BOT_SPAWN.z) < opts.spawn) continue
       const roadClear = opts.road ?? 0

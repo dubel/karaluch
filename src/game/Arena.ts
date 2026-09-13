@@ -1,21 +1,22 @@
 import {
   Box3,
-  BoxGeometry,
   CanvasTexture,
+  Group,
   Mesh,
   MeshStandardMaterial,
   PlaneGeometry,
   RepeatWrapping,
   SRGBColorSpace,
   Scene,
+  Vector3,
   type Object3D,
   type PerspectiveCamera,
   type Texture,
-  type Vector3,
 } from 'three'
 import type { Aabb } from './collision'
-import { ARENA_HALF, HOUSE_TARGET_LENGTH } from './config'
+import { ARENA_HALF, HOUSE_TARGET_LENGTH, type VillageProp } from './config'
 import { sowFoliage, type WindClock } from './foliage'
+import { installPerimeter } from './perimeter'
 import { createRoadMesh, installRoadGrade } from './road'
 import { normalizeModel, stripJunk } from './rig'
 import { displaceTerrain } from './terrain'
@@ -35,6 +36,8 @@ export class Arena {
   readonly atmosphere: Atmosphere
   private readonly scene: Scene
   private readonly groundMat: MeshStandardMaterial
+  private millSails: Object3D | null = null
+  private readonly millAxis = new Vector3(0, 0, 1)
 
   constructor(scene: Scene) {
     this.scene = scene
@@ -48,38 +51,17 @@ export class Arena {
     const ground = new Mesh(groundGeo, this.groundMat)
     ground.receiveShadow = true
     scene.add(ground)
+  }
 
-    const wallMat = new MeshStandardMaterial({ color: 0x3d3a32, roughness: 0.9 })
-    const wallH = 2.4
-    const thickness = 1.2
-    const span = ARENA_HALF * 2 + thickness
-    const walls = [
-      { x: 0, z: ARENA_HALF, w: span, d: thickness },
-      { x: 0, z: -ARENA_HALF, w: span, d: thickness },
-      { x: ARENA_HALF, z: 0, w: thickness, d: span },
-      { x: -ARENA_HALF, z: 0, w: thickness, d: span },
-    ]
-    for (const wall of walls) {
-      const mesh = new Mesh(new BoxGeometry(wall.w, wallH, wall.d), wallMat)
-      mesh.position.set(wall.x, wallH / 2, wall.z)
-      mesh.castShadow = true
-      mesh.receiveShadow = true
-      scene.add(mesh)
-      this.cameraBlockers.push({
-        minX: wall.x - wall.w / 2,
-        maxX: wall.x + wall.w / 2,
-        minZ: wall.z - wall.d / 2,
-        maxZ: wall.z + wall.d / 2,
-        minY: 0,
-        maxY: wallH,
-      })
-    }
+  addPerimeter(pack: Object3D): void {
+    installPerimeter(this.scene, pack, this.obstacles)
   }
 
   tick(dt: number, camera: PerspectiveCamera, follow: Vector3): void {
     this.atmosphere.tick(dt, camera, follow)
     this.groundMat.roughness = 0.94 - this.atmosphere.wetness * 0.28
     this.groundMat.metalness = 0.02 + this.atmosphere.wetness * 0.08
+    if (this.millSails) this.millSails.rotateOnAxis(this.millAxis, dt * 0.22)
   }
 
   addRoad(map: Texture): void {
@@ -94,8 +76,34 @@ export class Arena {
   }
 
   addHouse(model: Object3D): void {
+    this.placeProp(model, {
+      length: HOUSE_TARGET_LENGTH,
+      x: 0,
+      z: 0,
+      yaw: 0,
+      collideHx: 7.2,
+      collideHz: 7.2,
+    })
+  }
+
+  addVillageProp(model: Object3D, spec: VillageProp): void {
+    this.placeProp(model, spec)
+    if (spec.spinSails) {
+      const sails = rigMillSails(model)
+      this.millSails = sails.pivot
+      this.millAxis.copy(sails.axis)
+    }
+  }
+
+  private placeProp(
+    model: Object3D,
+    spec: { length: number; x: number; z: number; yaw: number; collideHx: number; collideHz: number },
+  ): void {
     stripJunk(model)
-    normalizeModel(model, HOUSE_TARGET_LENGTH)
+    normalizeModel(model, spec.length)
+    model.rotation.y = spec.yaw
+    model.position.x += spec.x
+    model.position.z += spec.z
     model.traverse((child) => {
       const mesh = child as Mesh
       if (!mesh.isMesh) return
@@ -105,12 +113,16 @@ export class Arena {
     this.scene.add(model)
 
     const box = new Box3().setFromObject(model)
-    const pad = 0.35
+    const cx = (box.min.x + box.max.x) * 0.5
+    const cz = (box.min.z + box.max.z) * 0.5
+    const pad = 0.2
+    const hx = Math.min((box.max.x - box.min.x) * 0.5 + pad, spec.collideHx)
+    const hz = Math.min((box.max.z - box.min.z) * 0.5 + pad, spec.collideHz)
     const aabb = {
-      minX: box.min.x - pad,
-      maxX: box.max.x + pad,
-      minZ: box.min.z - pad,
-      maxZ: box.max.z + pad,
+      minX: cx - hx,
+      maxX: cx + hx,
+      minZ: cz - hz,
+      maxZ: cz + hz,
       minY: box.min.y,
       maxY: box.max.y + 0.4,
     }
@@ -121,6 +133,14 @@ export class Arena {
   addFoliage(foliagePack: Object3D, grassPack: Object3D): void {
     sowFoliage(this.scene, foliagePack, grassPack, this.obstacles, this.cameraBlockers, this.wind)
   }
+}
+
+function rigMillSails(model: Object3D): { pivot: Object3D; axis: Vector3 } {
+  const vane = model.getObjectByName('vane') ?? model.getObjectByName('vane_tile_0')
+  if (!vane) {
+    return { pivot: new Group(), axis: new Vector3(1, 0, 0) }
+  }
+  return { pivot: vane, axis: new Vector3(1, 0, 0) }
 }
 
 function makeGrassMaterial(): MeshStandardMaterial {

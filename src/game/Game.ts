@@ -19,9 +19,11 @@ import {
   FOLIAGE_URL,
   GRASS_PATCH_URL,
   HOUSE_URL,
+  PERIMETER_URL,
   PLAYER_RIG,
   PLAYER_SPAWN,
   ROAD_DIFF_URL,
+  VILLAGE_PROPS,
 } from './config'
 import { Input } from './input'
 import { Projectile } from './Projectile'
@@ -75,26 +77,35 @@ export class Game {
     let playerGltf
     let botGltf
     let houseGltf
+    let villageGltfs
     let foliageGltf
     let grassGltf
     let roadDiff
+    let perimeterGltf
     try {
-      ;[playerGltf, botGltf, houseGltf, foliageGltf, grassGltf, roadDiff] = await Promise.all([
-        loader.loadAsync(PLAYER_RIG.url),
-        loader.loadAsync(BOT_RIG.url),
-        loader.loadAsync(HOUSE_URL),
-        loader.loadAsync(FOLIAGE_URL),
-        loader.loadAsync(GRASS_PATCH_URL),
-        texLoader.loadAsync(ROAD_DIFF_URL),
-        this.audio.load(),
-      ])
+      ;[playerGltf, botGltf, houseGltf, villageGltfs, foliageGltf, grassGltf, roadDiff, perimeterGltf] =
+        await Promise.all([
+          loader.loadAsync(PLAYER_RIG.url),
+          loader.loadAsync(BOT_RIG.url),
+          loader.loadAsync(HOUSE_URL),
+          Promise.all(VILLAGE_PROPS.map((prop) => loader.loadAsync(prop.url))),
+          loader.loadAsync(FOLIAGE_URL),
+          loader.loadAsync(GRASS_PATCH_URL),
+          texLoader.loadAsync(ROAD_DIFF_URL),
+          loader.loadAsync(PERIMETER_URL),
+          this.audio.load(),
+        ])
     } catch (error) {
       throw new Error(`GLB: ${error instanceof Error ? error.message : String(error)}`)
     }
     try {
       this.arena.addRoad(roadDiff)
       this.arena.addHouse(houseGltf.scene)
+      for (let i = 0; i < VILLAGE_PROPS.length; i++) {
+        this.arena.addVillageProp(villageGltfs[i].scene, VILLAGE_PROPS[i])
+      }
       this.arena.addFoliage(foliageGltf.scene, grassGltf.scene)
+      this.arena.addPerimeter(perimeterGltf.scene)
       this.player = new Tank(
         'player',
         playerGltf.scene,
@@ -126,6 +137,7 @@ export class Game {
     }
     this.playing = true
     this.hud.hideOverlay()
+    this.input.arm()
     this.input.lockPointer()
     releaseIntroMusic()
     this.audio.prime()

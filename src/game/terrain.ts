@@ -1,8 +1,10 @@
 import type { BufferGeometry } from 'three'
-import { ARENA_HALF } from './config'
+import { ARENA_HALF, WINDMILL_PROP } from './config'
 
 const HOUSE_FLAT = 12
 const HOUSE_BLEND = 22
+const MILL_FLAT = 6
+const MILL_BLEND = 14
 
 type Mound = { x: number; z: number; h: number; r: number }
 
@@ -25,6 +27,7 @@ function buildMounds(): Mound[] {
       const px = x + (hash2(x, z, 4.2) - 0.5) * cell * 0.72
       const pz = z + (hash2(z, x, 9.1) - 0.5) * cell * 0.72
       if (Math.hypot(px, pz) < 30) continue
+      if (Math.hypot(px - WINDMILL_PROP.x, pz - WINDMILL_PROP.z) < 18) continue
       if (Math.max(Math.abs(px), Math.abs(pz)) > limit) continue
       mounds.push({
         x: px,
@@ -57,6 +60,8 @@ function moundHeight(x: number, z: number): number {
 
 export function rawTerrainHeight(x: number, z: number): number {
   const house = 1 - smoothstep(HOUSE_FLAT, HOUSE_BLEND, Math.hypot(x, z))
+  const mill = 1 - smoothstep(MILL_FLAT, MILL_BLEND, Math.hypot(x - WINDMILL_PROP.x, z - WINDMILL_PROP.z))
+  const village = Math.max(house, mill)
   const edge = Math.max(Math.abs(x), Math.abs(z))
   const wall = smoothstep(ARENA_HALF - 12, ARENA_HALF, edge)
   const n =
@@ -65,7 +70,7 @@ export function rawTerrainHeight(x: number, z: number): number {
     Math.sin(x * 0.052 + z * 0.041 + 0.4) * 0.12 +
     Math.sin(x * 0.008 + z * 0.011 + 4.2) * 0.22
   const raw = Math.max(0, n) + moundHeight(x, z)
-  return raw * (1 - house * 0.95) * (1 - wall)
+  return raw * (1 - village * 0.95) * (1 - wall)
 }
 
 type GradeFn = (x: number, z: number, raw: number) => number

@@ -4,22 +4,40 @@ import { ARENA_HALF } from './config'
 const HOUSE_FLAT = 12
 const HOUSE_BLEND = 22
 
-const MOUNDS = [
-  { x: -36, z: 32, h: 3.5, r: 13 },
-  { x: 40, z: 18, h: 3.0, r: 12 },
-  { x: -18, z: -50, h: 3.4, r: 13 },
-  { x: 54, z: -42, h: 3.8, r: 15 },
-  { x: -58, z: -22, h: 2.8, r: 11 },
-  { x: -50, z: 54, h: 3.3, r: 14 },
-  { x: 30, z: 58, h: 2.6, r: 10 },
-  { x: 14, z: -30, h: 2.3, r: 9 },
-  { x: -30, z: 8, h: 2.1, r: 8.5 },
-  { x: 62, z: 38, h: 3.1, r: 12 },
-  { x: -64, z: -56, h: 2.9, r: 11 },
-  { x: 8, z: 42, h: 1.9, r: 7.5 },
-  { x: -8, z: 62, h: 2.4, r: 9 },
-  { x: 46, z: -8, h: 2.2, r: 8 },
-] as const
+type Mound = { x: number; z: number; h: number; r: number }
+
+function fract(n: number): number {
+  return n - Math.floor(n)
+}
+
+function hash2(x: number, z: number, salt: number): number {
+  return fract(Math.sin(x * 12.9898 + z * 78.233 + salt) * 43758.5453)
+}
+
+function buildMounds(): Mound[] {
+  const mounds: Mound[] = []
+  const cell = 38
+  const limit = ARENA_HALF - 26
+  for (let z = -limit + cell * 0.45; z <= limit; z += cell) {
+    for (let x = -limit + cell * 0.45; x <= limit; x += cell) {
+      const n = hash2(x, z, 1.7)
+      if (n < 0.28) continue
+      const px = x + (hash2(x, z, 4.2) - 0.5) * cell * 0.72
+      const pz = z + (hash2(z, x, 9.1) - 0.5) * cell * 0.72
+      if (Math.hypot(px, pz) < 30) continue
+      if (Math.max(Math.abs(px), Math.abs(pz)) > limit) continue
+      mounds.push({
+        x: px,
+        z: pz,
+        h: 1.7 + n * 2.4,
+        r: 7.4 + hash2(px, pz, 13.3) * 8.8,
+      })
+    }
+  }
+  return mounds
+}
+
+const MOUNDS = buildMounds()
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)))
@@ -40,12 +58,12 @@ function moundHeight(x: number, z: number): number {
 export function terrainHeight(x: number, z: number): number {
   const house = 1 - smoothstep(HOUSE_FLAT, HOUSE_BLEND, Math.hypot(x, z))
   const edge = Math.max(Math.abs(x), Math.abs(z))
-  const wall = smoothstep(ARENA_HALF - 9, ARENA_HALF, edge)
+  const wall = smoothstep(ARENA_HALF - 12, ARENA_HALF, edge)
   const n =
-    Math.sin(x * 0.042 + z * 0.031) * 0.32 +
-    Math.sin(x * 0.021 - z * 0.028 + 1.7) * 0.24 +
-    Math.sin(x * 0.078 + z * 0.064 + 0.4) * 0.12 +
-    Math.sin(x * 0.013 + z * 0.017 + 4.2) * 0.18
+    Math.sin(x * 0.024 + z * 0.018) * 0.36 +
+    Math.sin(x * 0.013 - z * 0.016 + 1.7) * 0.26 +
+    Math.sin(x * 0.052 + z * 0.041 + 0.4) * 0.12 +
+    Math.sin(x * 0.008 + z * 0.011 + 4.2) * 0.22
   const raw = Math.max(0, n) + moundHeight(x, z)
   return raw * (1 - house * 0.95) * (1 - wall)
 }
@@ -68,7 +86,7 @@ export function raycastTerrain(
   dz: number,
   maxDist: number,
 ): number | null {
-  const step = 0.28
+  const step = 0.35
   for (let t = 0.65; t <= maxDist; t += step) {
     const y = oy + dy * t
     if (y < terrainHeight(ox + dx * t, oz + dz * t) + 0.55) return t

@@ -24,13 +24,13 @@ export const HOUSE_URL = new URL(
   import.meta.url,
 ).href
 export const HOUSE_TARGET_LENGTH = 14
-/** Playable half-extent; 84/42 doubles the side and quadruples the surface. */
-export const ARENA_HALF = 84
+/** Playable half-extent; 168/84 doubles the side and quadruples the surface again. */
+export const ARENA_HALF = 168
 export const FOLIAGE_URL = new URL('../../assets/low_poly_trees_flowers_and_grass.glb', import.meta.url).href
 export const GRASS_PATCH_URL = new URL('../../assets/grass_patches_-_circle.glb', import.meta.url).href
 export const TREE_HEIGHT = 9.5
-export const PLAYER_SPAWN = { x: -48, z: 44, yaw: Math.PI * 0.72 }
-export const BOT_SPAWN = { x: 48, z: -40, yaw: -Math.PI * 0.28 }
+export const PLAYER_SPAWN = { x: -96, z: 88, yaw: Math.PI * 0.72 }
+export const BOT_SPAWN = { x: 96, z: -80, yaw: -Math.PI * 0.28 }
 
 export const PLAYER_RIG: RigConfig = {
   url: playerUrl,

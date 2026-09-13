@@ -105,9 +105,9 @@ export function sowFoliage(
       spawn: 11,
       wall: 5.5,
       skip: 0.22,
-      grove: 0.42,
+      grove: 0.38,
     }),
-    8.2,
+    8.6,
   )
   const typedTrees: Spot[][] = TREE_NAMES.map(() => [])
   for (const p of treeSpots) {
@@ -126,7 +126,7 @@ export function sowFoliage(
   plant(
     scene,
     circle,
-    scatter(9.5, rng, { house: 11, spawn: 1.6, wall: 2.8, skip: 0.12, grove: 0.08 }).map((p) => ({
+    scatter(10.8, rng, { house: 11, spawn: 1.6, wall: 2.8, skip: 0.12, grove: 0.08 }).map((p) => ({
       x: p.x,
       z: p.z,
       yaw: rng() * Math.PI * 2,
@@ -137,7 +137,7 @@ export function sowFoliage(
   plant(
     scene,
     tuft,
-    scatter(2.05, rng, { house: 10, spawn: 1.2, wall: 2.0, skip: 0.07, grove: 0.04 }).map((p) => ({
+    scatter(2.35, rng, { house: 10, spawn: 1.2, wall: 2.0, skip: 0.08, grove: 0.04 }).map((p) => ({
       x: p.x,
       z: p.z,
       yaw: rng() * Math.PI * 2,

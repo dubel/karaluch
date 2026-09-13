@@ -25,7 +25,7 @@ export class FollowCamera {
   private prevHullYaw = 0
 
   constructor() {
-    this.camera = new PerspectiveCamera(55, 1, 0.15, 420)
+    this.camera = new PerspectiveCamera(55, 1, 0.2, 780)
   }
 
   get facingYaw(): number {

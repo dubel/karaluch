@@ -31,25 +31,25 @@ export class Arena {
   constructor(scene: Scene) {
     this.scene = scene
     scene.background = new Color(0x6b7c8a)
-    scene.fog = new Fog(0x6b7c8a, 90, 260)
+    scene.fog = new Fog(0x6b7c8a, 140, 520)
 
     const hemi = new HemisphereLight(0xc5d4e0, 0x4a4030, 0.85)
     scene.add(hemi)
 
     const sun = new DirectionalLight(0xffe2b8, 1.45)
-    sun.position.set(55, 80, 36)
+    sun.position.set(90, 140, 60)
     sun.castShadow = true
     sun.shadow.mapSize.set(2048, 2048)
-    sun.shadow.camera.near = 4
-    sun.shadow.camera.far = 200
-    sun.shadow.camera.left = -95
-    sun.shadow.camera.right = 95
-    sun.shadow.camera.top = 95
-    sun.shadow.camera.bottom = -95
+    sun.shadow.camera.near = 8
+    sun.shadow.camera.far = 420
+    sun.shadow.camera.left = -160
+    sun.shadow.camera.right = 160
+    sun.shadow.camera.top = 160
+    sun.shadow.camera.bottom = -160
     sun.shadow.bias = -0.0004
     scene.add(sun)
 
-    const groundGeo = new PlaneGeometry(ARENA_HALF * 2.25, ARENA_HALF * 2.25, 192, 192)
+    const groundGeo = new PlaneGeometry(ARENA_HALF * 2.18, ARENA_HALF * 2.18, 256, 256)
     groundGeo.rotateX(-Math.PI / 2)
     displaceTerrain(groundGeo)
     const ground = new Mesh(groundGeo, makeGrassMaterial())
@@ -208,7 +208,7 @@ function makeGrassMap(): CanvasTexture {
   map.colorSpace = SRGBColorSpace
   map.wrapS = RepeatWrapping
   map.wrapT = RepeatWrapping
-  map.repeat.set(28, 28)
+  map.repeat.set(48, 48)
   map.anisotropy = 8
   return map
 }

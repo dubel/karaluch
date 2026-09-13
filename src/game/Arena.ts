@@ -27,6 +27,8 @@ export { ARENA_HALF } from './config'
 export class Arena {
   readonly obstacles: Aabb[] = []
   readonly cameraBlockers: Aabb[] = []
+  /** Extra shot volumes (tree crowns). Trunks/buildings live in `obstacles`. */
+  readonly cover: Aabb[] = []
   readonly wind: WindClock = {
     value: 0,
     strength: { value: 0.5 },
@@ -131,7 +133,7 @@ export class Arena {
   }
 
   addFoliage(foliagePack: Object3D, grassPack: Object3D): void {
-    sowFoliage(this.scene, foliagePack, grassPack, this.obstacles, this.cameraBlockers, this.wind)
+    sowFoliage(this.scene, foliagePack, grassPack, this.obstacles, this.cameraBlockers, this.cover, this.wind)
   }
 }
 

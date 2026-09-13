@@ -12,7 +12,7 @@ import {
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Arena } from './Arena'
 import { FollowCamera } from './camera'
-import { collidesAny, pointHitsObb } from './collision'
+import { pointHitsObb, raycastObstacles } from './collision'
 import {
   ARENA_HALF,
   BOT_RIG,
@@ -34,7 +34,7 @@ import {
 import { Input } from './input'
 import { Projectile } from './Projectile'
 import { Tank } from './Tank'
-import { terrainHeight } from './terrain'
+import { raycastTerrain } from './terrain'
 import { TrackMarks } from './TrackMarks'
 import { GameAudio } from './audio'
 import { CombatFx, MAX_WRECKS } from './fx'
@@ -319,14 +319,42 @@ export class Game {
   private updateProjectiles(dt: number): void {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const shot = this.projectiles[i]
-      shot.update(dt)
       const p = shot.object.position
-      if (p.y < terrainHeight(p.x, p.z) + 0.1 || collidesAny(p.x, p.z, 0, 0.12, 0.12, this.arena.obstacles)) {
-        shot.alive = false
-      } else {
-        this.tryHit(shot, this.player)
-        for (const unit of this.force) this.tryHit(shot, unit.tank)
-        for (const unit of this.allies) this.tryHit(shot, unit.tank)
+      const ox = p.x
+      const oy = p.y
+      const oz = p.z
+      shot.update(dt)
+      const nx = p.x
+      const ny = p.y
+      const nz = p.z
+      const span = Math.hypot(nx - ox, ny - oy, nz - oz)
+      if (span > 1e-5) {
+        const inv = 1 / span
+        const dx = (nx - ox) * inv
+        const dy = (ny - oy) * inv
+        const dz = (nz - oz) * inv
+        const reach = span + 0.08
+        const wall = raycastObstacles(ox, oy, oz, dx, dy, dz, reach, this.arena.obstacles)
+        const crown = raycastObstacles(ox, oy, oz, dx, dy, dz, reach, this.arena.cover)
+        const hill = raycastTerrain(ox, oy, oz, dx, dy, dz, reach, 0.12, 0.02, 0.28)
+        let block = reach + 1
+        if (wall !== null) block = Math.min(block, wall)
+        if (crown !== null) block = Math.min(block, crown)
+        if (hill !== null) block = Math.min(block, hill)
+        const travel = Math.min(span, block)
+        const steps = Math.max(1, Math.ceil(travel / 0.32))
+        for (let s = 1; s <= steps && shot.alive; s++) {
+          const t = (travel * s) / steps
+          p.set(ox + dx * t, oy + dy * t, oz + dz * t)
+          this.tryHit(shot, this.player)
+          for (const unit of this.force) this.tryHit(shot, unit.tank)
+          for (const unit of this.allies) this.tryHit(shot, unit.tank)
+        }
+        if (shot.alive && block <= span) {
+          p.set(ox + dx * block, oy + dy * block, oz + dz * block)
+          this.fx.hit(p)
+          shot.alive = false
+        }
       }
       if (!shot.alive) {
         shot.object.removeFromParent()

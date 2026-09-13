@@ -102,7 +102,7 @@ export const WORKSHOP = {
 export const WORKSHOP_RADIUS = TKS_LENGTH * 2
 export const WORKSHOP_BARRELS_URL = new URL('../../assets/barrels_and_pallet.glb', import.meta.url).href
 export const WORKSHOP_WRENCH_URL = new URL('../../assets/monkey_wrench_low_poly.glb', import.meta.url).href
-export const WORKSHOP_HEAL_RATE = 0.01
+export const WORKSHOP_HEAL_RATE = 0.02
 /** SE road past the village — opposite the TKS approach. */
 export const ENEMY_SPAWNS = [
   { x: 96, z: -80, yaw: Math.atan2(-96, 80) },
@@ -135,7 +135,7 @@ export const PLAYER_RIG: RigConfig = {
   reverseSpeed: 4.2,
   turnSpeed: 2.25,
   turretTurnSpeed: 2.4,
-  fireCooldown: 0.85,
+  fireCooldown: 0.85 * 0.75,
   damage: 1,
   projectileSpeed: 72,
   cameraDistance: 11,
@@ -158,8 +158,8 @@ export const BOT_RIG: RigConfig = {
   gunPitchMin: -0.34,
   gunPitchMax: 0.28,
   maxHp: 3,
-  moveSpeed: 6.4,
-  reverseSpeed: 3.1,
+  moveSpeed: 9 / 1.4,
+  reverseSpeed: 4.2 / 1.4,
   turnSpeed: 1.35,
   turretTurnSpeed: 1.85,
   fireCooldown: 1.55,

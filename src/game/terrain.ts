@@ -102,11 +102,13 @@ export function raycastTerrain(
   dy: number,
   dz: number,
   maxDist: number,
+  pad = 0.55,
+  start = 0.65,
+  step = 0.35,
 ): number | null {
-  const step = 0.35
-  for (let t = 0.65; t <= maxDist; t += step) {
+  for (let t = start; t <= maxDist; t += step) {
     const y = oy + dy * t
-    if (y < terrainHeight(ox + dx * t, oz + dz * t) + 0.55) return t
+    if (y < terrainHeight(ox + dx * t, oz + dz * t) + pad) return t
   }
   return null
 }

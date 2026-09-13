@@ -71,6 +71,7 @@ export function sowFoliage(
   grassPack: Object3D,
   obstacles: Aabb[],
   cameraBlockers: Aabb[],
+  cover: Aabb[],
   wind: WindClock,
 ): void {
   stripJunk(foliagePack)
@@ -127,7 +128,7 @@ export function sowFoliage(
   }
   for (let i = 0; i < trees.length; i++) {
     plant(scene, trees[i], typedTrees[i], { slope: 0, tint: true, rng, wind })
-    addTreeCollision(typedTrees[i], obstacles, cameraBlockers)
+    addTreeCollision(typedTrees[i], obstacles, cameraBlockers, cover)
   }
 
   plant(
@@ -275,7 +276,12 @@ function plant(
   }
 }
 
-function addTreeCollision(spots: Spot[], obstacles: Aabb[], cameraBlockers: Aabb[]): void {
+function addTreeCollision(
+  spots: Spot[],
+  obstacles: Aabb[],
+  cameraBlockers: Aabb[],
+  cover: Aabb[],
+): void {
   for (const spot of spots) {
     const y = terrainHeight(spot.x, spot.z)
     const r = 0.58 * spot.scale
@@ -289,6 +295,15 @@ function addTreeCollision(spots: Spot[], obstacles: Aabb[], cameraBlockers: Aabb
     }
     obstacles.push(aabb)
     cameraBlockers.push(aabb)
+    const crown = 1.9 * spot.scale
+    cover.push({
+      minX: spot.x - crown,
+      maxX: spot.x + crown,
+      minZ: spot.z - crown,
+      maxZ: spot.z + crown,
+      minY: y,
+      maxY: y + TREE_HEIGHT * spot.scale,
+    })
   }
 }
 

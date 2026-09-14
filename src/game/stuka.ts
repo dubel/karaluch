@@ -16,14 +16,15 @@ import type { Tank } from './Tank'
 
 const BOMB_FALL = 3
 const BLAST_RADIUS = 6.1
-const PLANE_LIFE = 12.4
-const START_DIST = 255
-const EXIT_DIST = -195
-const START_ALT = 94
-const DIVE_ALT = 44
-const EXIT_ALT = 102
-const FORMATION = [-20, 0, 20]
-const DROP_U = [0.46, 0.505, 0.55]
+const PLANE_LIFE = 9.2
+const START_DIST = 68
+const EXIT_DIST = -72
+const START_ALT = 9.2
+const DIVE_ALT = 6.4
+const EXIT_ALT = 15
+const FORMATION = [-12, 0, 12]
+const DROP_U = [0.36, 0.42, 0.48]
+const STAGGER = [0, 0.18, 0.36]
 
 const bombGeo = new CapsuleGeometry(0.22, 1.28, 3, 8)
 const bombMat = new MeshStandardMaterial({
@@ -102,7 +103,7 @@ export class StukaRaid {
       visual.traverse((obj) => {
         const mesh = obj as Mesh
         if (!mesh.isMesh) return
-        mesh.castShadow = false
+        mesh.castShadow = true
         mesh.receiveShadow = false
       })
       const root = new Group()
@@ -112,18 +113,17 @@ export class StukaRaid {
     }
   }
 
-  begin(polish: Tank[], scene: Scene): boolean {
+  begin(polish: Tank[], scene: Scene, facingYaw: number): boolean {
     if (this.craft.length < 3 || this.active) return false
     const living = polish.filter((tank) => tank.alive)
     if (living.length === 0) return false
-    this.spawnFormation(living, scene)
+    this.spawnFormation(living, scene, facingYaw)
     return this.planes.length > 0
   }
 
-  private spawnFormation(living: Tank[], scene: Scene): void {
-    const yaw = Math.random() * Math.PI * 2
-    const dirX = Math.sin(yaw)
-    const dirZ = Math.cos(yaw)
+  private spawnFormation(living: Tank[], scene: Scene, facingYaw: number): void {
+    const dirX = -Math.sin(facingYaw)
+    const dirZ = -Math.cos(facingYaw)
     const sideX = dirZ
     const sideZ = -dirX
     const target = firstOnApproach(living, dirX, dirZ)
@@ -134,17 +134,18 @@ export class StukaRaid {
     this.inbound = true
     for (let i = 0; i < 3; i++) {
       const craft = this.craft[i]
-      const offset = FORMATION[i] + (Math.random() - 0.5) * 3
-      const start = samplePath(0, dirX, dirZ, sideX, sideZ, offset, aimX, aimZ)
+      const offset = FORMATION[i] + (Math.random() - 0.5) * 1.6
+      const t0 = STAGGER[i]
+      const start = samplePath(t0 / PLANE_LIFE, dirX, dirZ, sideX, sideZ, offset, aimX, aimZ)
       craft.root.visible = true
       craft.root.position.set(start.x, start.y, start.z)
-      faceVelocity(craft.root, dirX, -0.42, dirZ)
+      faceVelocity(craft.root, dirX, -0.38, dirZ)
       scene.add(craft.root)
       this.planes.push({
         root: craft.root,
         props: craft.props,
-        t: 0,
-        delay: i * 0.28,
+        t: t0,
+        delay: 0,
         dirX,
         dirZ,
         sideX,
@@ -192,7 +193,7 @@ export class StukaRaid {
       this.planes.splice(i, 1)
     }
 
-    this.inbound = this.planes.some((plane) => plane.t / PLANE_LIFE < 0.62)
+    this.inbound = this.planes.some((plane) => plane.t / PLANE_LIFE < 0.7)
 
     for (const bomb of this.bombs) {
       bomb.age += dt
@@ -276,16 +277,13 @@ function samplePath(
   aimX: number,
   aimZ: number,
 ): { x: number; y: number; z: number } {
-  const t = u * u * (3 - 2 * u)
+  const t = u ** 1.18
   const remaining = START_DIST + (EXIT_DIST - START_DIST) * t
   const x = aimX - dirX * remaining + sideX * offset
   const z = aimZ - dirZ * remaining + sideZ * offset
   let alt = START_ALT
-  if (u < 0.16) {
-    alt = START_ALT
-  } else if (u < 0.5) {
-    const d = (u - 0.16) / 0.34
-    alt = START_ALT + (DIVE_ALT - START_ALT) * d * d
+  if (u < 0.5) {
+    alt = START_ALT + (DIVE_ALT - START_ALT) * (u / 0.5)
   } else if (u < 0.62) {
     alt = DIVE_ALT
   } else {

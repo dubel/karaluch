@@ -459,7 +459,7 @@ export class Game {
   private launchStukaRaid(): void {
     if (!this.player || !this.playing || this.roundOver || this.stukas.active) return
     const polish = [this.player, ...this.allies.map((unit) => unit.tank)]
-    if (!this.stukas.begin(polish, this.scene)) return
+    if (!this.stukas.begin(polish, this.scene, this.cameraRig.facingYaw)) return
     this.audio.startStukaRaid()
     this.stukaAt = nextStukaAt(this.kills)
   }

@@ -12,7 +12,7 @@ import {
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Arena } from './Arena'
 import { FollowCamera } from './camera'
-import { pointHitsObb, raycastObstacles } from './collision'
+import { hullCoverAabb, pointHitsObb, raycastObstacles, type Aabb } from './collision'
 import {
   ARENA_HALF,
   BOT_RIG,
@@ -68,6 +68,7 @@ export class Game {
   private readonly force: CombatUnit[] = []
   private readonly allies: CombatUnit[] = []
   private readonly wrecks: Tank[] = []
+  private readonly wreckCover: Aabb[] = []
   private arena!: Arena
   private workshop!: Workshop
   private player!: Tank
@@ -506,10 +507,12 @@ export class Game {
         const reach = span + 0.08
         const wall = raycastObstacles(ox, oy, oz, dx, dy, dz, reach, this.arena.obstacles)
         const crown = raycastObstacles(ox, oy, oz, dx, dy, dz, reach, this.arena.cover)
+        const hulks = raycastObstacles(ox, oy, oz, dx, dy, dz, reach, this.wreckCover)
         const hill = raycastTerrain(ox, oy, oz, dx, dy, dz, reach, 0.12, 0.02, 0.28)
         let block = reach + 1
         if (wall !== null) block = Math.min(block, wall)
         if (crown !== null) block = Math.min(block, crown)
+        if (hulks !== null) block = Math.min(block, hulks)
         if (hill !== null) block = Math.min(block, hill)
         const travel = Math.min(span, block)
         const steps = Math.max(1, Math.ceil(travel / 0.32))
@@ -560,12 +563,7 @@ export class Game {
     this.kills += 1
     if (this.kills >= this.stukaAt) this.launchStukaRaid()
     if (allyArrivesOnKill(this.kills)) this.spawnAlly()
-    if (this.wrecks.length >= MAX_WRECKS) {
-      const oldest = this.wrecks.shift()
-      oldest?.object.removeFromParent()
-      this.fx.douseOldest()
-    }
-    this.wrecks.push(tank)
+    this.pushWreck(tank)
     const idx = this.force.findIndex((unit) => unit.tank === tank)
     if (idx >= 0) this.force.splice(idx, 1)
     if (this.force.length === 0) {
@@ -575,12 +573,7 @@ export class Game {
   }
 
   private onAllyKilled(tank: Tank): void {
-    if (this.wrecks.length >= MAX_WRECKS) {
-      const oldest = this.wrecks.shift()
-      oldest?.object.removeFromParent()
-      this.fx.douseOldest()
-    }
-    this.wrecks.push(tank)
+    this.pushWreck(tank)
     const idx = this.allies.findIndex((unit) => unit.tank === tank)
     if (idx >= 0) this.allies.splice(idx, 1)
   }
@@ -646,6 +639,28 @@ export class Game {
     this.force.length = 0
     this.allies.length = 0
     this.wrecks.length = 0
+    this.wreckCover.length = 0
+  }
+
+  private pushWreck(tank: Tank): void {
+    if (this.wrecks.length >= MAX_WRECKS) {
+      const oldest = this.wrecks.shift()
+      oldest?.object.removeFromParent()
+      this.wreckCover.shift()
+      this.fx.douseOldest()
+    }
+    this.wrecks.push(tank)
+    this.wreckCover.push(
+      hullCoverAabb(
+        tank.position.x,
+        tank.position.y,
+        tank.position.z,
+        tank.hullYaw,
+        tank.halfWidth,
+        tank.halfLength,
+        tank.height,
+      ),
+    )
   }
 
   private allBodies(): Tank[] {

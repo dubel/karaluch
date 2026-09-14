@@ -61,8 +61,8 @@ export class CombatFx {
     this.sparkCol = spark.col
     this.smokePos = smoke.pos
     this.smokeCol = smoke.col
-    this.sparks.renderOrder = 4
-    this.smoke.renderOrder = 3
+    this.sparks.renderOrder = 2
+    this.smoke.renderOrder = 2
     this.sparks.frustumCulled = false
     this.smoke.frustumCulled = false
   }
@@ -374,7 +374,7 @@ function makeCloud(count: number, map: CanvasTexture, additive: boolean): {
     vertexColors: true,
     transparent: true,
     depthWrite: false,
-    depthTest: false,
+    depthTest: true,
     sizeAttenuation: true,
     blending: additive ? AdditiveBlending : NormalBlending,
     opacity: additive ? 1 : 0.85,

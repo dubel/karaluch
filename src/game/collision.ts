@@ -115,6 +115,29 @@ export function clampToBounds(
   }
 }
 
+export function hullCoverAabb(
+  x: number,
+  y: number,
+  z: number,
+  yaw: number,
+  halfW: number,
+  halfL: number,
+  height: number,
+): Aabb {
+  const c = Math.abs(Math.cos(yaw))
+  const s = Math.abs(Math.sin(yaw))
+  const hx = halfW * c + halfL * s
+  const hz = halfW * s + halfL * c
+  return {
+    minX: x - hx,
+    maxX: x + hx,
+    minZ: z - hz,
+    maxZ: z + hz,
+    minY: y,
+    maxY: y + height,
+  }
+}
+
 export function pointHitsObb(
   px: number,
   pz: number,

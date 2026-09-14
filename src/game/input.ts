@@ -1,3 +1,5 @@
+import { STAS_CONTROLS } from './config'
+
 export class Input {
   readonly keys = new Set<string>()
   mouseDx = 0
@@ -77,6 +79,12 @@ export class Input {
   }
 
   throttle(): number {
+    if (STAS_CONTROLS) {
+      let v = 0
+      if (this.keys.has('ArrowUp')) v += 1
+      if (this.keys.has('ArrowDown')) v -= 1
+      return v
+    }
     let v = 0
     if (this.keys.has('KeyW')) v += 1
     if (this.keys.has('KeyS')) v -= 1
@@ -84,6 +92,12 @@ export class Input {
   }
 
   elevate(): number {
+    if (STAS_CONTROLS) {
+      let v = 0
+      if (this.keys.has('KeyW')) v += 1
+      if (this.keys.has('KeyS')) v -= 1
+      return v
+    }
     let v = 0
     if (this.keys.has('ArrowUp')) v += 1
     if (this.keys.has('ArrowDown')) v -= 1
@@ -91,6 +105,12 @@ export class Input {
   }
 
   steer(): number {
+    if (STAS_CONTROLS) {
+      let v = 0
+      if (this.keys.has('ArrowLeft')) v += 1
+      if (this.keys.has('ArrowRight')) v -= 1
+      return v
+    }
     let v = 0
     if (this.keys.has('KeyA')) v += 1
     if (this.keys.has('KeyD')) v -= 1
@@ -98,7 +118,17 @@ export class Input {
   }
 
   private onKeyDown = (event: KeyboardEvent): void => {
-    if (
+    if (STAS_CONTROLS) {
+      if (
+        event.code === 'Space' ||
+        event.code === 'ArrowUp' ||
+        event.code === 'ArrowDown' ||
+        event.code === 'ArrowLeft' ||
+        event.code === 'ArrowRight'
+      ) {
+        event.preventDefault()
+      }
+    } else if (
       event.code === 'Space' ||
       event.code === 'ArrowUp' ||
       event.code === 'ArrowDown' ||
@@ -117,7 +147,9 @@ export class Input {
       this.fireHeld = true
     }
     if (event.code === 'KeyR') this.restart = true
-    if (event.code === 'KeyQ') this.artillery = true
+    if (STAS_CONTROLS) {
+      if (event.code === 'KeyA') this.artillery = true
+    } else if (event.code === 'KeyQ') this.artillery = true
     if (event.code === 'KeyM') this.markers = true
   }
 

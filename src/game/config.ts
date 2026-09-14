@@ -26,7 +26,7 @@ export type RigConfig = {
 const playerUrl = new URL('../../assets/tks_20mm_tankette.glb', import.meta.url).href
 const botUrl = new URL('../../assets/tank_pz_kpfw_iii_ausf_b__1937.glb', import.meta.url).href
 export const STUKA_URL = new URL('../../assets/junkers_ju_87_stuka.glb', import.meta.url).href
-export const STUKA_LENGTH = 16.4
+export const STUKA_LENGTH = 12.2
 export const HOUSE_URL = new URL(
   '../../assets/painted_house_-_zalipie_in_southern_poland.glb',
   import.meta.url,

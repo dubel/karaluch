@@ -16,15 +16,15 @@ import type { Tank } from './Tank'
 
 const BOMB_FALL = 3
 const BLAST_RADIUS = 6.1
-const PLANE_LIFE = 9.2
-const START_DIST = 68
+const PLANE_LIFE = 13.4
+const START_DIST = 186
 const EXIT_DIST = -72
-const START_ALT = 9.2
+const START_ALT = 11.4
 const DIVE_ALT = 6.4
 const EXIT_ALT = 15
-const FORMATION = [-12, 0, 12]
-const DROP_U = [0.36, 0.42, 0.48]
-const STAGGER = [0, 0.18, 0.36]
+const FORMATION = [-16, 0, 16]
+const DROP_U = [0.58, 0.63, 0.68]
+const STAGGER = [0, 0.35, 0.7]
 
 const bombGeo = new CapsuleGeometry(0.22, 1.28, 3, 8)
 const bombMat = new MeshStandardMaterial({
@@ -193,7 +193,7 @@ export class StukaRaid {
       this.planes.splice(i, 1)
     }
 
-    this.inbound = this.planes.some((plane) => plane.t / PLANE_LIFE < 0.7)
+    this.inbound = this.planes.some((plane) => plane.t / PLANE_LIFE < 0.78)
 
     for (const bomb of this.bombs) {
       bomb.age += dt
@@ -277,17 +277,17 @@ function samplePath(
   aimX: number,
   aimZ: number,
 ): { x: number; y: number; z: number } {
-  const t = u ** 1.18
+  const t = u ** 1.06
   const remaining = START_DIST + (EXIT_DIST - START_DIST) * t
   const x = aimX - dirX * remaining + sideX * offset
   const z = aimZ - dirZ * remaining + sideZ * offset
   let alt = START_ALT
-  if (u < 0.5) {
-    alt = START_ALT + (DIVE_ALT - START_ALT) * (u / 0.5)
-  } else if (u < 0.62) {
+  if (u < 0.62) {
+    alt = START_ALT + (DIVE_ALT - START_ALT) * (u / 0.62)
+  } else if (u < 0.72) {
     alt = DIVE_ALT
   } else {
-    const p = (u - 0.62) / 0.38
+    const p = (u - 0.72) / 0.28
     alt = DIVE_ALT + (EXIT_ALT - DIVE_ALT) * p * p * (3 - 2 * p)
   }
   return { x, y: terrainHeight(x, z) + alt, z }

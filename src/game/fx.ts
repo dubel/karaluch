@@ -149,14 +149,20 @@ export class CombatFx {
       flash.light.visible = false
       this.flashes.splice(i, 1)
     }
-    stepSparks(this.sparkList, this.sparkPos, this.sparkCol, dt, SPARK_MAX)
-    stepSmoke(this.smokeList, this.smokePos, this.smokeCol, dt, SMOKE_MAX)
-    this.sparks.geometry.attributes.position.needsUpdate = true
-    this.sparks.geometry.attributes.color.needsUpdate = true
-    this.smoke.geometry.attributes.position.needsUpdate = true
-    this.smoke.geometry.attributes.color.needsUpdate = true
-    this.sparks.geometry.setDrawRange(0, this.sparkList.length)
-    this.smoke.geometry.setDrawRange(0, this.smokeList.length)
+    stepSparks(this.sparkList, this.sparkPos, this.sparkCol, dt)
+    stepSmoke(this.smokeList, this.smokePos, this.smokeCol, dt)
+    const sparkN = this.sparkList.length
+    const smokeN = this.smokeList.length
+    if (sparkN > 0) {
+      this.sparks.geometry.attributes.position.needsUpdate = true
+      this.sparks.geometry.attributes.color.needsUpdate = true
+    }
+    if (smokeN > 0) {
+      this.smoke.geometry.attributes.position.needsUpdate = true
+      this.smoke.geometry.attributes.color.needsUpdate = true
+    }
+    this.sparks.geometry.setDrawRange(0, sparkN)
+    this.smoke.geometry.setDrawRange(0, smokeN)
   }
 
   clear(): void {
@@ -178,8 +184,20 @@ export class CombatFx {
   }
 
   private flash(at: Vector3): void {
-    const used = new Set(this.flashes.map((item) => item.light))
-    const light = this.flashPool.find((item) => !used.has(item))
+    let light: PointLight | undefined
+    for (const item of this.flashPool) {
+      let busy = false
+      for (const flash of this.flashes) {
+        if (flash.light === item) {
+          busy = true
+          break
+        }
+      }
+      if (!busy) {
+        light = item
+        break
+      }
+    }
     if (!light) return
     light.visible = true
     light.intensity = 14
@@ -261,13 +279,7 @@ export class CombatFx {
   }
 }
 
-function stepSparks(
-  list: Particle[],
-  pos: Float32Array,
-  col: Float32Array,
-  dt: number,
-  cap: number,
-): void {
+function stepSparks(list: Particle[], pos: Float32Array, col: Float32Array, dt: number): void {
   for (let i = list.length - 1; i >= 0; i--) {
     const p = list[i]
     p.life += dt
@@ -291,12 +303,8 @@ function stepSparks(
     p.y += p.vy * dt
     p.z += p.vz * dt
   }
-  for (let i = 0; i < cap; i++) {
+  for (let i = 0; i < list.length; i++) {
     const p = list[i]
-    if (!p) {
-      pos[i * 3 + 1] = -99
-      continue
-    }
     pos[i * 3] = p.x
     pos[i * 3 + 1] = p.y
     pos[i * 3 + 2] = p.z
@@ -315,13 +323,7 @@ function stepSparks(
   }
 }
 
-function stepSmoke(
-  list: Particle[],
-  pos: Float32Array,
-  col: Float32Array,
-  dt: number,
-  cap: number,
-): void {
+function stepSmoke(list: Particle[], pos: Float32Array, col: Float32Array, dt: number): void {
   for (let i = list.length - 1; i >= 0; i--) {
     const p = list[i]
     p.life += dt
@@ -336,12 +338,8 @@ function stepSmoke(
     p.y += p.vy * dt
     p.z += p.vz * dt
   }
-  for (let i = 0; i < cap; i++) {
+  for (let i = 0; i < list.length; i++) {
     const p = list[i]
-    if (!p) {
-      pos[i * 3 + 1] = -99
-      continue
-    }
     pos[i * 3] = p.x
     pos[i * 3 + 1] = p.y
     pos[i * 3 + 2] = p.z
@@ -400,8 +398,10 @@ function circleTexture(inner: string, outer: string): CanvasTexture {
   return tex
 }
 
+const _rand = new Vector3()
+
 function randDir(): Vector3 {
   const a = Math.random() * Math.PI * 2
   const y = Math.random() * 2 - 0.3
-  return new Vector3(Math.cos(a), y, Math.sin(a)).normalize()
+  return _rand.set(Math.cos(a), y, Math.sin(a)).normalize()
 }

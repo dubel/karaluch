@@ -5,22 +5,67 @@ export type Aabb = {
   maxZ: number
   minY?: number
   maxY?: number
+  _g?: number
 }
 
-function projectRadius(
-  halfW: number,
-  halfL: number,
-  axisX: number,
-  axisZ: number,
-  yaw: number,
-): number {
-  const c = Math.cos(yaw)
-  const s = Math.sin(yaw)
-  const rightX = c
-  const rightZ = -s
-  const fwdX = s
-  const fwdZ = c
-  return halfW * Math.abs(rightX * axisX + rightZ * axisZ) + halfL * Math.abs(fwdX * axisX + fwdZ * axisZ)
+export type ObstacleSet = Aabb[] | AabbIndex
+
+const _nearScratch: Aabb[] = []
+const _rayScratch: Aabb[] = []
+
+function packCell(i: number, j: number): number {
+  return ((i + 4096) & 8191) | (((j + 4096) & 8191) << 13)
+}
+
+/** Uniform grid over static AABBs. Large boxes occupy every overlapping cell. */
+export class AabbIndex {
+  private readonly cell: number
+  private readonly buckets = new Map<number, Aabb[]>()
+  private stamp = 1
+
+  constructor(boxes: Aabb[], cell = 22) {
+    this.cell = cell
+    for (const box of boxes) {
+      const minI = Math.floor(box.minX / cell)
+      const maxI = Math.floor(box.maxX / cell)
+      const minJ = Math.floor(box.minZ / cell)
+      const maxJ = Math.floor(box.maxZ / cell)
+      for (let j = minJ; j <= maxJ; j++) {
+        for (let i = minI; i <= maxI; i++) {
+          const k = packCell(i, j)
+          let list = this.buckets.get(k)
+          if (!list) {
+            list = []
+            this.buckets.set(k, list)
+          }
+          list.push(box)
+        }
+      }
+    }
+  }
+
+  nearby(x: number, z: number, radius: number, into: Aabb[]): Aabb[] {
+    into.length = 0
+    const gen = this.stamp++
+    if (this.stamp > 1_000_000_000) this.stamp = 1
+    const c = this.cell
+    const minI = Math.floor((x - radius) / c)
+    const maxI = Math.floor((x + radius) / c)
+    const minJ = Math.floor((z - radius) / c)
+    const maxJ = Math.floor((z + radius) / c)
+    for (let j = minJ; j <= maxJ; j++) {
+      for (let i = minI; i <= maxI; i++) {
+        const list = this.buckets.get(packCell(i, j))
+        if (!list) continue
+        for (const box of list) {
+          if (box._g === gen) continue
+          box._g = gen
+          into.push(box)
+        }
+      }
+    }
+    return into
+  }
 }
 
 export function obbHitsAabb(
@@ -38,21 +83,23 @@ export function obbHitsAabb(
   const boxHz = (box.maxZ - box.minZ) * 0.5 + padding
   const dx = x - boxCx
   const dz = z - boxCz
-
-  if (Math.abs(dx) > boxHx + projectRadius(halfW, halfL, 1, 0, yaw)) return false
-  if (Math.abs(dz) > boxHz + projectRadius(halfW, halfL, 0, 1, yaw)) return false
-
   const c = Math.cos(yaw)
   const s = Math.sin(yaw)
+  const absC = Math.abs(c)
+  const absS = Math.abs(s)
+
+  if (Math.abs(dx) > boxHx + halfW * absC + halfL * absS) return false
+  if (Math.abs(dz) > boxHz + halfW * absS + halfL * absC) return false
+
   const rightX = c
   const rightZ = -s
   const fwdX = s
   const fwdZ = c
 
-  if (Math.abs(dx * rightX + dz * rightZ) > halfW + boxHx * Math.abs(rightX) + boxHz * Math.abs(rightZ)) {
+  if (Math.abs(dx * rightX + dz * rightZ) > halfW + boxHx * absC + boxHz * absS) {
     return false
   }
-  if (Math.abs(dx * fwdX + dz * fwdZ) > halfL + boxHx * Math.abs(fwdX) + boxHz * Math.abs(fwdZ)) {
+  if (Math.abs(dx * fwdX + dz * fwdZ) > halfL + boxHx * absS + boxHz * absC) {
     return false
   }
   return true
@@ -72,19 +119,30 @@ export function obbHitsObb(
 ): boolean {
   const dx = ax - bx
   const dz = az - bz
-  const axes = [
-    [Math.cos(aYaw), -Math.sin(aYaw)],
-    [Math.sin(aYaw), Math.cos(aYaw)],
-    [Math.cos(bYaw), -Math.sin(bYaw)],
-    [Math.sin(bYaw), Math.cos(bYaw)],
-  ] as const
-
-  for (const [axisX, axisZ] of axes) {
-    const ar = projectRadius(aHalfW, aHalfL, axisX, axisZ, aYaw)
-    const br = projectRadius(bHalfW, bHalfL, axisX, axisZ, bYaw)
-    if (Math.abs(dx * axisX + dz * axisZ) > ar + br) return false
-  }
+  const ac = Math.cos(aYaw)
+  const as = Math.sin(aYaw)
+  const bc = Math.cos(bYaw)
+  const bs = Math.sin(bYaw)
+  if (Math.abs(dx * ac + dz * -as) > aHalfW + projExtent(bHalfW, bHalfL, ac, -as, bc, bs)) return false
+  if (Math.abs(dx * as + dz * ac) > aHalfL + projExtent(bHalfW, bHalfL, as, ac, bc, bs)) return false
+  if (Math.abs(dx * bc + dz * -bs) > bHalfW + projExtent(aHalfW, aHalfL, bc, -bs, ac, as)) return false
+  if (Math.abs(dx * bs + dz * bc) > bHalfL + projExtent(aHalfW, aHalfL, bs, bc, ac, as)) return false
   return true
+}
+
+function projExtent(
+  halfW: number,
+  halfL: number,
+  axisX: number,
+  axisZ: number,
+  c: number,
+  s: number,
+): number {
+  return halfW * Math.abs(c * axisX + -s * axisZ) + halfL * Math.abs(s * axisX + c * axisZ)
+}
+
+function asList(x: number, z: number, radius: number, obstacles: ObstacleSet, scratch: Aabb[]): Aabb[] {
+  return obstacles instanceof AabbIndex ? obstacles.nearby(x, z, radius, scratch) : obstacles
 }
 
 export function collidesAny(
@@ -93,9 +151,10 @@ export function collidesAny(
   yaw: number,
   halfW: number,
   halfL: number,
-  obstacles: Aabb[],
+  obstacles: ObstacleSet,
 ): boolean {
-  for (const box of obstacles) {
+  const list = asList(x, z, Math.hypot(halfW, halfL) + 0.55, obstacles, _nearScratch)
+  for (const box of list) {
     if (obbHitsAabb(x, z, yaw, halfW, halfL, box, 0.05)) return true
   }
   return false
@@ -171,13 +230,11 @@ export function raycastAabb(
   let tMin = 0
   let tMax = maxT
 
-  const slabs: Array<[number, number, number, number]> = [
-    [ox, dx, box.minX, box.maxX],
-    [oy, dy, minY, maxY],
-    [oz, dz, box.minZ, box.maxZ],
-  ]
-
-  for (const [origin, dir, min, max] of slabs) {
+  for (let axis = 0; axis < 3; axis++) {
+    const origin = axis === 0 ? ox : axis === 1 ? oy : oz
+    const dir = axis === 0 ? dx : axis === 1 ? dy : dz
+    const min = axis === 0 ? box.minX : axis === 1 ? minY : box.minZ
+    const max = axis === 0 ? box.maxX : axis === 1 ? maxY : box.maxZ
     if (Math.abs(dir) < 1e-8) {
       if (origin < min || origin > max) return null
       continue
@@ -189,8 +246,8 @@ export function raycastAabb(
       t1 = t2
       t2 = swap
     }
-    tMin = Math.max(tMin, t1)
-    tMax = Math.min(tMax, t2)
+    if (t1 > tMin) tMin = t1
+    if (t2 < tMax) tMax = t2
     if (tMin > tMax) return null
   }
 
@@ -208,10 +265,12 @@ export function raycastObstacles(
   dy: number,
   dz: number,
   maxT: number,
-  boxes: Aabb[],
+  boxes: ObstacleSet,
 ): number | null {
+  const rad = Math.hypot(dx * maxT, dz * maxT) * 0.5 + 1.6
+  const list = asList(ox + dx * maxT * 0.5, oz + dz * maxT * 0.5, rad, boxes, _rayScratch)
   let best: number | null = null
-  for (const box of boxes) {
+  for (const box of list) {
     const t = raycastAabb(ox, oy, oz, dx, dy, dz, maxT, box)
     if (t !== null && (best === null || t < best)) best = t
   }

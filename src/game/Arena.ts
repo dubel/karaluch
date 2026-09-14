@@ -13,7 +13,7 @@ import {
   type PerspectiveCamera,
   type Texture,
 } from 'three'
-import type { Aabb } from './collision'
+import { AabbIndex, type Aabb } from './collision'
 import { ARENA_HALF, HOUSE_TARGET_LENGTH, type VillageProp } from './config'
 import { sowFoliage, type WindClock } from './foliage'
 import { installPerimeter } from './perimeter'
@@ -29,6 +29,9 @@ export class Arena {
   readonly cameraBlockers: Aabb[] = []
   /** Extra shot volumes (tree crowns). Trunks/buildings live in `obstacles`. */
   readonly cover: Aabb[] = []
+  obstacleIndex = new AabbIndex([])
+  coverIndex = new AabbIndex([])
+  blockerIndex = new AabbIndex([])
   readonly wind: WindClock = {
     value: 0,
     strength: { value: 0.5 },
@@ -57,6 +60,13 @@ export class Arena {
 
   addPerimeter(pack: Object3D): void {
     installPerimeter(this.scene, pack, this.obstacles)
+  }
+
+  /** Call after every static AABB has been pushed (houses, trees, workshop). */
+  indexCollision(): void {
+    this.obstacleIndex = new AabbIndex(this.obstacles)
+    this.coverIndex = new AabbIndex(this.cover)
+    this.blockerIndex = new AabbIndex(this.cameraBlockers)
   }
 
   tick(dt: number, camera: PerspectiveCamera, follow: Vector3): void {

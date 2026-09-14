@@ -279,7 +279,7 @@ export class Atmosphere {
     scene.add(this.moon.target)
 
     this.skyMat = makeSkyMaterial()
-    this.sky = new Mesh(new SphereGeometry(620, 40, 24), this.skyMat)
+    this.sky = new Mesh(new SphereGeometry(620, 24, 16), this.skyMat)
     this.sky.frustumCulled = false
     this.sky.renderOrder = -20
     scene.add(this.sky)

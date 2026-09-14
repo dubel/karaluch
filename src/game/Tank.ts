@@ -10,7 +10,7 @@ import {
 } from 'three'
 import type { RigConfig } from './config'
 import { applyRig, type TankRig } from './rig'
-import { clampToBounds, collidesAny, obbHitsObb, type Aabb } from './collision'
+import { clampToBounds, collidesAny, obbHitsObb, type ObstacleSet } from './collision'
 import { Projectile } from './Projectile'
 import { terrainHeight } from './terrain'
 
@@ -205,10 +205,17 @@ export class Tank {
   }
 
   tickHitSway(dt: number): void {
-    this.hitRollVel += -this.hitRoll * 38 * dt
-    this.hitRollVel *= Math.exp(-5.5 * dt)
-    this.hitRoll += this.hitRollVel * dt
-    this.applyHullPose()
+    const swaying = Math.abs(this.hitRoll) > 1e-4 || Math.abs(this.hitRollVel) > 1e-4
+    if (swaying) {
+      this.hitRollVel += -this.hitRoll * 38 * dt
+      this.hitRollVel *= Math.exp(-5.5 * dt)
+      this.hitRoll += this.hitRollVel * dt
+      if (Math.abs(this.hitRoll) < 1e-5 && Math.abs(this.hitRollVel) < 1e-5) {
+        this.hitRoll = 0
+        this.hitRollVel = 0
+      }
+      this.applyHullPose()
+    }
     this.tickBeacon(dt)
   }
 
@@ -216,7 +223,7 @@ export class Tank {
     const mesh = new Mesh(BEACON_GEO, this.team === 'pl' ? BEACON_ALLY : BEACON_ENEMY)
     mesh.castShadow = false
     mesh.receiveShadow = false
-    mesh.frustumCulled = false
+    mesh.frustumCulled = true
     mesh.renderOrder = 6
     this.beacon = mesh
     this.object.add(mesh)
@@ -235,12 +242,17 @@ export class Tank {
       this.dropBeacon()
       return
     }
+    if (!beaconsOn) {
+      this.beacon.visible = false
+      this.beaconT += dt
+      return
+    }
     this.beaconT += dt
     const t = this.beaconT
     const pulse = 0.5 + 0.5 * Math.sin(t * 2.35)
     this.beacon.position.y = this.height + 1.18 + Math.sin(t * 2.05) * 0.34
     this.beacon.scale.setScalar(0.94 + pulse * 0.14)
-    this.beacon.visible = beaconsOn
+    this.beacon.visible = true
     this.object.getWorldQuaternion(_beaconWorld)
     this.beacon.quaternion.copy(_beaconWorld).invert()
   }
@@ -249,7 +261,7 @@ export class Tank {
     throttle: number,
     steer: number,
     dt: number,
-    obstacles: Aabb[],
+    obstacles: ObstacleSet,
     halfArena: number,
     others: Tank[] = [],
   ): void {
@@ -349,7 +361,7 @@ export class Tank {
     this.sitOnTerrain()
   }
 
-  private unstickFromTanks(others: Tank[], obstacles: Aabb[], halfArena: number): void {
+  private unstickFromTanks(others: Tank[], obstacles: ObstacleSet, halfArena: number): void {
     for (let n = 0; n < 4; n++) {
       let pushed = false
       for (const other of others) {
@@ -497,7 +509,7 @@ export class Tank {
     this.getShotRay(_muzzle, _dir)
     return new Projectile(
       this.id,
-      _muzzle.clone(),
+      _muzzle,
       _dir,
       this.config.projectileSpeed,
       this.config.damage,

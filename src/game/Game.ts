@@ -52,6 +52,7 @@ import { formatHeldTime, type Hud } from '../ui/hud'
 type CombatUnit = { tank: Tank; ai: Bot }
 
 const _kidAim = new Vector3()
+const _fxAt = new Vector3()
 
 export class Game {
   private readonly renderer: WebGLRenderer
@@ -171,6 +172,7 @@ export class Game {
         this.arena.obstacles,
         this.arena.cameraBlockers,
       )
+      this.arena.indexCollision()
       this.botTemplate = botGltf.scene
       this.playerTemplate = playerGltf.scene
       this.stukas.setTemplate(stukaGltf.scene)
@@ -260,6 +262,9 @@ export class Game {
 
     const mouse = this.input.consumeMouse()
     const bodies = this.collectBodies()
+    const repairing = this.workshop
+      ? this.workshop.contains(this.player.position.x, this.player.position.z)
+      : false
     if (this.playing && !this.roundOver && this.player.alive) {
       this.missionTime += dt
       this.player.nudgeYaw(-mouse.dx * 0.0052)
@@ -269,7 +274,7 @@ export class Game {
         this.input.throttle(),
         this.input.steer(),
         dt,
-        this.arena.obstacles,
+        this.arena.obstacleIndex,
         ARENA_HALF,
         bodies,
       )
@@ -285,7 +290,6 @@ export class Game {
         const on = toggleBeacons()
         this.hud.flash(on ? 'Znaczniki włączone' : 'Znaczniki wyłączone')
       }
-      const repairing = this.workshop.contains(this.player.position.x, this.player.position.z)
       if (repairing) {
         this.player.heal(this.player.config.maxHp * WORKSHOP_HEAL_RATE * dt)
       }
@@ -303,12 +307,12 @@ export class Game {
       const friendlies = this.collectFriendlies()
       for (const unit of this.force) {
         const hunt = closestAlive(unit.tank, friendlies) ?? this.player
-        this.spawnShot(unit.ai.update(dt, hunt, this.arena.obstacles, bodies))
+        this.spawnShot(unit.ai.update(dt, hunt, this.arena.obstacleIndex, bodies))
       }
       const hostiles = this.collectHostiles()
       for (const unit of this.allies) {
         const hunt = closestAlive(unit.tank, hostiles) ?? this.player
-        this.spawnShot(unit.ai.update(dt, hunt, this.arena.obstacles, bodies))
+        this.spawnShot(unit.ai.update(dt, hunt, this.arena.obstacleIndex, bodies))
       }
       this.advanceWave(dt)
       this.tracks.stamp(this.player)
@@ -335,13 +339,17 @@ export class Game {
     this.updateProjectiles(dt)
 
     if (this.player) {
-      this.cameraRig.update(this.player, dt, this.arena.cameraBlockers)
+      this.cameraRig.update(this.player, dt, this.arena.blockerIndex)
       this.arena.tick(dt, this.cameraRig.camera, this.player.position)
       this.hud.setAtmosphere(this.arena.atmosphere.label)
       this.audio.setWeather(this.arena.atmosphere.rain, this.arena.atmosphere.wind)
       this.audio.tickAmbience(dt, this.arena.atmosphere.clockHour, this.arena.atmosphere.rain)
       const thunder = this.arena.atmosphere.consumeThunder()
       if (thunder) this.audio.thunder(thunder)
+      let roster = this.player.alive ? 1 : 0
+      for (const unit of this.allies) {
+        if (unit.tank.alive) roster += 1
+      }
       this.hud.update(
         this.player.hp,
         this.player.config.maxHp,
@@ -350,9 +358,9 @@ export class Game {
         this.player.gunPitch,
         this.player.config.gunPitchMin,
         this.player.config.gunPitchMax,
-        this.workshop.contains(this.player.position.x, this.player.position.z),
+        repairing,
         this.artilleryCharge(),
-        (this.player.alive ? 1 : 0) + this.allies.filter((unit) => unit.tank.alive).length,
+        roster,
       )
       this.checkRound()
     }
@@ -429,8 +437,8 @@ export class Game {
       this.hud.flash('Artyleria gotowa')
     }
     this.barrage.update(dt, (x, y, z, tank) => {
-      const at = new Vector3(x, y + 0.4, z)
-      this.fx.explode(at)
+      _fxAt.set(x, y + 0.4, z)
+      this.fx.explode(_fxAt)
       this.audio.artilleryBurst()
       if (tank && tank.alive && Math.hypot(tank.position.x - x, tank.position.z - z) < 4.8) {
         const killed = tank.takeDamage(99)
@@ -457,7 +465,7 @@ export class Game {
         this.stukaDebugWait = this.stukas.active ? -1 : 0.6
       }
     }
-    const polish = this.player ? [this.player, ...this.allies.map((unit) => unit.tank)] : []
+    const polish = this.player ? this.collectFriendlies() : []
     const was = this.stukas.active
     this.stukas.update(dt, polish, (x, y, z) => this.onStukaBomb(x, y, z))
     this.hud.setStukaAlert(this.stukas.warning && this.playing && !this.roundOver)
@@ -466,32 +474,33 @@ export class Game {
 
   private launchStukaRaid(): void {
     if (!this.player || !this.playing || this.roundOver || this.stukas.active) return
-    const polish = [this.player, ...this.allies.map((unit) => unit.tank)]
+    const polish = this.collectFriendlies()
     if (!this.stukas.begin(polish, this.scene, this.cameraRig.facingYaw)) return
     this.audio.startStukaRaid()
     this.stukaAt = nextStukaAt(this.kills)
   }
 
   private onStukaBomb(x: number, y: number, z: number): void {
-    const at = new Vector3(x, y + 0.35, z)
-    this.fx.bombBurst(at)
+    _fxAt.set(x, y + 0.35, z)
+    this.fx.bombBurst(_fxAt)
     this.audio.bombBurst()
     this.cameraRig.shake(0.52)
     if (!this.player) return
     const dmg = this.player.config.maxHp * 0.2
-    const victims = [this.player, ...this.allies.map((unit) => unit.tank)]
-    for (const tank of victims) {
-      if (!tank.alive) continue
-      if (Math.hypot(tank.position.x - x, tank.position.z - z) > STUKA_BLAST) continue
-      const killed = tank.takeDamage(dmg)
-      if (!killed) continue
-      const fxAt = tank.position.clone()
-      fxAt.y += tank.height * 0.55
-      this.audio.explode()
-      this.fx.explode(fxAt)
-      this.fx.igniteWreck(tank.position, tank.height)
-      if (tank.id !== 'player') this.onAllyKilled(tank)
-    }
+    this.hurtStukaVictim(this.player, x, z, dmg)
+    for (const unit of this.allies) this.hurtStukaVictim(unit.tank, x, z, dmg)
+  }
+
+  private hurtStukaVictim(tank: Tank, x: number, z: number, dmg: number): void {
+    if (!tank.alive) return
+    if (Math.hypot(tank.position.x - x, tank.position.z - z) > STUKA_BLAST) return
+    const killed = tank.takeDamage(dmg)
+    if (!killed) return
+    _fxAt.set(tank.position.x, tank.position.y + tank.height * 0.55, tank.position.z)
+    this.audio.explode()
+    this.fx.explode(_fxAt)
+    this.fx.igniteWreck(tank.position, tank.height)
+    if (tank.id !== 'player') this.onAllyKilled(tank)
   }
 
   private updateProjectiles(dt: number): void {
@@ -512,8 +521,8 @@ export class Game {
         const dy = (ny - oy) * inv
         const dz = (nz - oz) * inv
         const reach = span + 0.08
-        const wall = raycastObstacles(ox, oy, oz, dx, dy, dz, reach, this.arena.obstacles)
-        const crown = raycastObstacles(ox, oy, oz, dx, dy, dz, reach, this.arena.cover)
+        const wall = raycastObstacles(ox, oy, oz, dx, dy, dz, reach, this.arena.obstacleIndex)
+        const crown = raycastObstacles(ox, oy, oz, dx, dy, dz, reach, this.arena.coverIndex)
         const hulks = raycastObstacles(ox, oy, oz, dx, dy, dz, reach, this.wreckCover)
         const hill = raycastTerrain(ox, oy, oz, dx, dy, dz, reach, 0.12, 0.02, 0.28)
         let block = reach + 1
@@ -551,13 +560,12 @@ export class Game {
     if (p.y < tank.position.y - 0.2 || p.y > tank.position.y + tank.height + 0.4 * kidPad) return
     if (pointHitsObb(p.x, p.z, tank.position.x, tank.position.z, tank.hullYaw, tank.halfWidth * kidPad, tank.halfLength * kidPad)) {
       const killed = tank.takeDamage(shot.damage)
-      const fxAt = tank.position.clone()
-      fxAt.y += tank.height * 0.55
+      _fxAt.set(tank.position.x, tank.position.y + tank.height * 0.55, tank.position.z)
       this.audio.hit()
-      this.fx.hit(fxAt)
+      this.fx.hit(_fxAt)
       if (killed) {
         this.audio.explode()
-        this.fx.explode(fxAt)
+        this.fx.explode(_fxAt)
         this.fx.igniteWreck(tank.position, tank.height)
         if (tank.team === 'de') this.onEnemyKilled(tank)
         else if (tank.id !== 'player') this.onAllyKilled(tank)

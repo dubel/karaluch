@@ -1,6 +1,8 @@
 import { Mesh, MeshBasicMaterial, SphereGeometry, Vector3 } from 'three'
 
 const geometry = new SphereGeometry(0.12, 6, 5)
+const MAT_PLAYER = new MeshBasicMaterial({ color: 0xffe08a, toneMapped: false })
+const MAT_ENEMY = new MeshBasicMaterial({ color: 0xff5a3a, toneMapped: false })
 
 export type ShotSide = 'player' | 'enemy'
 export type ShotTeam = 'pl' | 'de'
@@ -29,10 +31,7 @@ export class Projectile {
     this.team = side === 'player' ? 'pl' : 'de'
     this.damage = damage
     this.velocity = direction.clone().normalize().multiplyScalar(speed)
-    this.object = new Mesh(
-      geometry,
-      new MeshBasicMaterial({ color: side === 'enemy' ? 0xff5a3a : 0xffe08a, toneMapped: false }),
-    )
+    this.object = new Mesh(geometry, side === 'enemy' ? MAT_ENEMY : MAT_PLAYER)
     this.object.position.copy(origin)
     this.object.castShadow = false
   }

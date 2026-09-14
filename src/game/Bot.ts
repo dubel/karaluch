@@ -1,5 +1,5 @@
 import { Vector3 } from 'three'
-import type { Aabb } from './collision'
+import type { ObstacleSet } from './collision'
 import { ARENA_HALF, ENEMY_ACCURACY, KID_MODE } from './config'
 import type { Tank } from './Tank'
 import type { Projectile } from './Projectile'
@@ -31,7 +31,7 @@ export class Bot {
     this.ring = kind === 'ally' ? 16 + Math.abs(this.slotOffset) * 4 : waveSize === 1 ? 22 : 24 + Math.abs(this.slotOffset) * 7
   }
 
-  update(dt: number, hunt: Tank, obstacles: Aabb[], others: Tank[]): Projectile | null {
+  update(dt: number, hunt: Tank, obstacles: ObstacleSet, others: Tank[]): Projectile | null {
     if (!this.tank.alive || !hunt.alive) return null
     this.bumpCool = Math.max(0, this.bumpCool - dt)
 
@@ -104,7 +104,6 @@ export class Bot {
 
     this.tank.drive(throttle, steer, dt, obstacles, ARENA_HALF, others)
 
-    this.tank.applyAimPose()
     this.tank.muzzle.getWorldPosition(_origin)
     const huntYaw = Math.atan2(aimX - _origin.x, aimZ - _origin.z)
     const horiz = Math.hypot(aimX - _origin.x, aimZ - _origin.z)

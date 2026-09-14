@@ -72,32 +72,51 @@ export function installPerimeter(scene: Scene, pack: Object3D, obstacles: Aabb[]
   }
 }
 
+function tileSpots(spots: Spot[], cell = 40): Spot[][] {
+  const buckets = new Map<number, Spot[]>()
+  for (const spot of spots) {
+    const ix = Math.floor((spot.x + ARENA_HALF) / cell)
+    const iz = Math.floor((spot.z + ARENA_HALF) / cell)
+    const key = (ix + 256) | ((iz + 256) << 12)
+    let list = buckets.get(key)
+    if (!list) {
+      list = []
+      buckets.set(key, list)
+    }
+    list.push(spot)
+  }
+  return [...buckets.values()]
+}
+
 function plantPieces(scene: Scene, pieces: Piece[], spots: Spot[], rng: () => number): void {
   const buckets: Spot[][] = pieces.map(() => [])
   for (const spot of spots) {
     buckets[Math.floor(rng() * pieces.length)].push(spot)
   }
   for (let p = 0; p < pieces.length; p++) {
-    const list = buckets[p]
-    if (list.length === 0) continue
     const piece = pieces[p]
-    const mesh = new InstancedMesh(piece.geometry, piece.material, list.length)
-    mesh.castShadow = true
-    mesh.receiveShadow = true
-    mesh.frustumCulled = false
-    for (let i = 0; i < list.length; i++) {
-      const spot = list[i]
-      const yaw = piece.wire
-        ? (spot.alongX === piece.alongZ ? Math.PI / 2 : 0) + (rng() - 0.5) * 0.07
-        : rng() * Math.PI * 2
-      _dummy.position.set(spot.x, terrainHeight(spot.x, spot.z), spot.z)
-      _dummy.rotation.set(0, yaw, 0)
-      _dummy.scale.setScalar(1)
-      _dummy.updateMatrix()
-      mesh.setMatrixAt(i, _dummy.matrix)
+    for (const list of tileSpots(buckets[p])) {
+      if (list.length === 0) continue
+      const mesh = new InstancedMesh(piece.geometry, piece.material, list.length)
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+      mesh.frustumCulled = true
+      for (let i = 0; i < list.length; i++) {
+        const spot = list[i]
+        const yaw = piece.wire
+          ? (spot.alongX === piece.alongZ ? Math.PI / 2 : 0) + (rng() - 0.5) * 0.07
+          : rng() * Math.PI * 2
+        _dummy.position.set(spot.x, terrainHeight(spot.x, spot.z), spot.z)
+        _dummy.rotation.set(0, yaw, 0)
+        _dummy.scale.setScalar(1)
+        _dummy.updateMatrix()
+        mesh.setMatrixAt(i, _dummy.matrix)
+      }
+      mesh.instanceMatrix.needsUpdate = true
+      mesh.computeBoundingSphere()
+      if (mesh.boundingSphere) mesh.boundingSphere.radius += 1.2
+      scene.add(mesh)
     }
-    mesh.instanceMatrix.needsUpdate = true
-    scene.add(mesh)
   }
 }
 

@@ -234,6 +234,24 @@ ${shader.vertexShader}`.replace(
   }
 }
 
+const TILE = 40
+
+function tileByCell<T extends { x: number; z: number }>(spots: T[], cell = TILE): T[][] {
+  const buckets = new Map<number, T[]>()
+  for (const spot of spots) {
+    const ix = Math.floor((spot.x + ARENA_HALF) / cell)
+    const iz = Math.floor((spot.z + ARENA_HALF) / cell)
+    const key = (ix + 256) | ((iz + 256) << 12)
+    let list = buckets.get(key)
+    if (!list) {
+      list = []
+      buckets.set(key, list)
+    }
+    list.push(spot)
+  }
+  return [...buckets.values()]
+}
+
 function plant(
   scene: Scene,
   proto: Proto,
@@ -241,11 +259,20 @@ function plant(
   opts: { slope: number; tint: boolean; rng: () => number; wind: WindClock },
 ): void {
   if (spots.length === 0) return
+  for (const chunk of tileByCell(spots)) plantChunk(scene, proto, chunk, opts)
+}
+
+function plantChunk(
+  scene: Scene,
+  proto: Proto,
+  spots: Spot[],
+  opts: { slope: number; tint: boolean; rng: () => number; wind: WindClock },
+): void {
   for (const part of proto.parts) {
     part.material.userData.windClock = opts.wind
     const mesh = new InstancedMesh(part.geometry, part.material, spots.length)
     mesh.name = proto.name
-    mesh.frustumCulled = false
+    mesh.frustumCulled = true
     mesh.castShadow = /wood|bark/i.test(part.material.name)
     mesh.receiveShadow = !mesh.castShadow
     for (let i = 0; i < spots.length; i++) {
@@ -272,6 +299,8 @@ function plant(
     }
     mesh.instanceMatrix.needsUpdate = true
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+    mesh.computeBoundingSphere()
+    if (mesh.boundingSphere) mesh.boundingSphere.radius += 2.4
     scene.add(mesh)
   }
 }

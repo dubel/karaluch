@@ -1,5 +1,5 @@
 import { PerspectiveCamera, Vector3 } from 'three'
-import { raycastObstacles, type Aabb } from './collision'
+import { raycastObstacles, type ObstacleSet } from './collision'
 import { raycastTerrain, terrainHeight } from './terrain'
 import type { Tank } from './Tank'
 
@@ -60,7 +60,7 @@ export class FollowCamera {
     )
   }
 
-  update(tank: Tank, dt: number, blockers: Aabb[]): void {
+  update(tank: Tank, dt: number, blockers: ObstacleSet): void {
     if (!this.ready) this.reset(tank)
 
     const hullRate = wrapPi(tank.hullYaw - this.prevHullYaw) / Math.max(dt, 1 / 120)

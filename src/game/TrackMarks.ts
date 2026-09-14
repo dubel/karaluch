@@ -36,6 +36,7 @@ export class TrackMarks {
   private readonly last = new Map<string, LastPose>()
   private readonly padW = new Float32Array(MAX)
   private cursor = 0
+  private paintWait = 0
 
   constructor() {
     const geo = new PlaneGeometry(1, 0.16)
@@ -99,6 +100,9 @@ export class TrackMarks {
   }
 
   update(dt: number): void {
+    this.paintWait += dt
+    const paint = this.paintWait >= 0.1
+    if (paint) this.paintWait = 0
     let matrixChanged = false
     let colorChanged = false
     for (let i = 0; i < MAX; i++) {
@@ -111,6 +115,7 @@ export class TrackMarks {
         matrixChanged = true
         continue
       }
+      if (!paint) continue
       const fade = markStyle(this.ages[i], _c)
       this.mesh.setColorAt(i, _c)
       colorChanged = true

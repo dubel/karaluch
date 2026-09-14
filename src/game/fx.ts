@@ -102,10 +102,10 @@ export class CombatFx {
   }
 
   bombBurst(at: Vector3): void {
-    for (let i = 0; i < 26; i++) this.spawnSpark(at, 11)
-    for (let i = 0; i < 22; i++) this.spawnFire(at, 1.6)
-    for (let i = 0; i < 28; i++) this.spawnDirt(at)
-    for (let i = 0; i < 10; i++) this.spawnSmoke(at, 2.8, 1.15 + Math.random() * 0.8)
+    for (let i = 0; i < 12; i++) this.spawnSpark(at, 9)
+    for (let i = 0; i < 8; i++) this.spawnFire(at, 1.35)
+    for (let i = 0; i < 12; i++) this.spawnDirt(at)
+    for (let i = 0; i < 5; i++) this.spawnSmoke(at, 2.4, 1.05 + Math.random() * 0.7)
     this.flash(at)
   }
 
@@ -137,7 +137,7 @@ export class CombatFx {
       if (puff) {
         _puff.set(wreck.x + (Math.random() - 0.5) * 0.55, wreck.y, wreck.z + (Math.random() - 0.5) * 0.55)
         this.spawnSmoke(_puff, 1.35)
-        for (let n = 0; n < 3; n++) this.spawnFire(_puff, 0.4)
+        this.spawnFire(_puff, 0.4)
       }
     }
     for (let i = this.flashes.length - 1; i >= 0; i--) {

@@ -24,6 +24,7 @@ export class FollowCamera {
   private ready = false
   private prevHullYaw = 0
   private shakeAmp = 0
+  private shakePhase = 0
 
   constructor() {
     this.camera = new PerspectiveCamera(55, 1, 0.2, 920)
@@ -112,10 +113,11 @@ export class FollowCamera {
     this.camera.lookAt(_look)
     this.shakeAmp *= Math.exp(-5.8 * dt)
     if (this.shakeAmp > 0.004) {
+      this.shakePhase += dt * 36
       const s = this.shakeAmp
-      this.camera.position.x += (Math.random() - 0.5) * s * 1.55
-      this.camera.position.y += (Math.random() - 0.5) * s * 1.05
-      this.camera.position.z += (Math.random() - 0.5) * s * 1.55
+      this.camera.position.x += Math.sin(this.shakePhase) * s * 0.85
+      this.camera.position.y += Math.cos(this.shakePhase * 1.55) * s * 0.52
+      this.camera.position.z += Math.sin(this.shakePhase * 0.82 + 1.1) * s * 0.85
     }
   }
 }

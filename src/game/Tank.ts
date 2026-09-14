@@ -127,7 +127,7 @@ export class Tank {
       const mesh = child as Mesh
       if (!mesh.isMesh) return
       mesh.castShadow = true
-      mesh.receiveShadow = true
+      mesh.receiveShadow = false
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
       const cloned = mats.map((mat) => (mat instanceof MeshStandardMaterial ? mat.clone() : mat))
       mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0]

@@ -262,13 +262,13 @@ export class Atmosphere {
 
     this.sun = new DirectionalLight(0xffe2b8, 1.45)
     this.sun.castShadow = true
-    this.sun.shadow.mapSize.set(2048, 2048)
+    this.sun.shadow.mapSize.set(1024, 1024)
     this.sun.shadow.camera.near = 8
-    this.sun.shadow.camera.far = 420
-    this.sun.shadow.camera.left = -150
-    this.sun.shadow.camera.right = 150
-    this.sun.shadow.camera.top = 150
-    this.sun.shadow.camera.bottom = -150
+    this.sun.shadow.camera.far = 320
+    this.sun.shadow.camera.left = -110
+    this.sun.shadow.camera.right = 110
+    this.sun.shadow.camera.top = 110
+    this.sun.shadow.camera.bottom = -110
     this.sun.shadow.bias = -0.0004
     scene.add(this.sun)
     scene.add(this.sun.target)

@@ -103,8 +103,9 @@ export class StukaRaid {
       visual.traverse((obj) => {
         const mesh = obj as Mesh
         if (!mesh.isMesh) return
-        mesh.castShadow = true
+        mesh.castShadow = false
         mesh.receiveShadow = false
+        mesh.frustumCulled = true
       })
       const root = new Group()
       root.visible = false
@@ -248,7 +249,7 @@ export class StukaRaid {
       iz = plane.root.position.z + plane.dirZ * 18 + Math.cos(yaw) * 8
     }
     const mesh = new Mesh(bombGeo, bombMat)
-    mesh.castShadow = true
+    mesh.castShadow = false
     mesh.position.copy(plane.root.position)
     mesh.position.y -= 1.1
     scene.add(mesh)

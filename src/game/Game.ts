@@ -1,7 +1,7 @@
 import {
   Clock,
   LoadingManager,
-  PCFSoftShadowMap,
+  PCFShadowMap,
   Scene,
   SRGBColorSpace,
   TextureLoader,
@@ -69,6 +69,10 @@ export class Game {
   private readonly allies: CombatUnit[] = []
   private readonly wrecks: Tank[] = []
   private readonly wreckCover: Aabb[] = []
+  private readonly bodiesBuf: Tank[] = []
+  private readonly friendliesBuf: Tank[] = []
+  private readonly hostilesBuf: Tank[] = []
+  private trackStampEven = false
   private arena!: Arena
   private workshop!: Workshop
   private player!: Tank
@@ -96,7 +100,7 @@ export class Game {
     this.renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
     this.renderer.outputColorSpace = SRGBColorSpace
     this.renderer.shadowMap.enabled = true
-    this.renderer.shadowMap.type = PCFSoftShadowMap
+    this.renderer.shadowMap.type = PCFShadowMap
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.resize()
     window.addEventListener('resize', () => this.resize())
@@ -242,7 +246,7 @@ export class Game {
 
   private loop = (): void => {
     requestAnimationFrame(this.loop)
-    const dt = Math.min(this.clock.getDelta(), 0.05)
+    const dt = Math.min(this.clock.getDelta(), 0.08)
     this.update(dt)
     this.renderer.render(this.scene, this.cameraRig.camera)
   }
@@ -255,7 +259,7 @@ export class Game {
     }
 
     const mouse = this.input.consumeMouse()
-    const bodies = this.allBodies()
+    const bodies = this.collectBodies()
     if (this.playing && !this.roundOver && this.player.alive) {
       this.missionTime += dt
       this.player.nudgeYaw(-mouse.dx * 0.0052)
@@ -296,20 +300,23 @@ export class Game {
       } else {
         this.input.consumeFireClick()
       }
-      const friendlies = [this.player, ...this.allies.map((unit) => unit.tank)]
+      const friendlies = this.collectFriendlies()
       for (const unit of this.force) {
         const hunt = closestAlive(unit.tank, friendlies) ?? this.player
         this.spawnShot(unit.ai.update(dt, hunt, this.arena.obstacles, bodies))
       }
-      const hostiles = this.force.map((unit) => unit.tank)
+      const hostiles = this.collectHostiles()
       for (const unit of this.allies) {
         const hunt = closestAlive(unit.tank, hostiles) ?? this.player
         this.spawnShot(unit.ai.update(dt, hunt, this.arena.obstacles, bodies))
       }
       this.advanceWave(dt)
       this.tracks.stamp(this.player)
-      for (const unit of this.force) this.tracks.stamp(unit.tank)
-      for (const unit of this.allies) this.tracks.stamp(unit.tank)
+      this.trackStampEven = !this.trackStampEven
+      if (this.trackStampEven) {
+        for (const unit of this.force) this.tracks.stamp(unit.tank)
+        for (const unit of this.allies) this.tracks.stamp(unit.tank)
+      }
     } else {
       this.audio.stopEngine()
       this.player?.applyAimPose()
@@ -663,10 +670,28 @@ export class Game {
     )
   }
 
-  private allBodies(): Tank[] {
-    const list: Tank[] = [this.player, ...this.wrecks]
+  private collectBodies(): Tank[] {
+    const list = this.bodiesBuf
+    list.length = 0
+    list.push(this.player)
+    for (const wreck of this.wrecks) list.push(wreck)
     for (const unit of this.force) list.push(unit.tank)
     for (const unit of this.allies) list.push(unit.tank)
+    return list
+  }
+
+  private collectFriendlies(): Tank[] {
+    const list = this.friendliesBuf
+    list.length = 0
+    list.push(this.player)
+    for (const unit of this.allies) list.push(unit.tank)
+    return list
+  }
+
+  private collectHostiles(): Tank[] {
+    const list = this.hostilesBuf
+    list.length = 0
+    for (const unit of this.force) list.push(unit.tank)
     return list
   }
 

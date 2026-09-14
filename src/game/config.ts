@@ -25,6 +25,8 @@ export type RigConfig = {
 
 const playerUrl = new URL('../../assets/tks_20mm_tankette.glb', import.meta.url).href
 const botUrl = new URL('../../assets/tank_pz_kpfw_iii_ausf_b__1937.glb', import.meta.url).href
+export const STUKA_URL = new URL('../../assets/junkers_ju_87_stuka.glb', import.meta.url).href
+export const STUKA_LENGTH = 12.6
 export const HOUSE_URL = new URL(
   '../../assets/painted_house_-_zalipie_in_southern_poland.glb',
   import.meta.url,
@@ -110,6 +112,7 @@ export const WORKSHOP_HEAL_RATE = 0.02
 const kidParam = new URLSearchParams(window.location.search).get('kid')
 export const KID_MODE = parseFlag(kidParam) || kidParam?.trim().toLowerCase() === 'stas'
 export const STAS_CONTROLS = kidParam?.trim().toLowerCase() === 'stas'
+export const STUKA_DEBUG = parseFlag(new URLSearchParams(window.location.search).get('stuka'))
 export const ENEMY_ACCURACY = KID_MODE ? 0.05 : 0.8
 export const ARTY_SHELLS_PER_TANK = 5
 export const ARTY_HIT_CHANCE = 0.8

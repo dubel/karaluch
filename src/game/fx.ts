@@ -13,7 +13,7 @@ import {
   type Scene,
 } from 'three'
 
-type Kind = 'spark' | 'smoke' | 'fire'
+type Kind = 'spark' | 'smoke' | 'fire' | 'dirt'
 type Particle = {
   kind: Kind
   x: number
@@ -28,8 +28,9 @@ type Particle = {
 }
 
 export const MAX_WRECKS = 10
-const SPARK_MAX = 260
-const SMOKE_MAX = 280
+const SPARK_MAX = 480
+const SMOKE_MAX = 360
+const FLASH_MAX = 6
 const _c = new Color()
 const _puff = new Vector3()
 
@@ -44,6 +45,8 @@ export class CombatFx {
   private readonly smokeCol: Float32Array
   private readonly wrecks: { x: number; y: number; z: number; light: PointLight; t: number }[] = []
   private readonly lightPool: PointLight[] = []
+  private readonly flashes: { light: PointLight; life: number }[] = []
+  private readonly flashPool: PointLight[] = []
   private puffAcc = 0
   private prepared = false
 
@@ -74,6 +77,13 @@ export class CombatFx {
       scene.add(light)
       this.lightPool.push(light)
     }
+    for (let i = 0; i < FLASH_MAX; i++) {
+      const light = new PointLight(0xff7a22, 0, 22, 1.6)
+      light.castShadow = false
+      light.visible = false
+      scene.add(light)
+      this.flashPool.push(light)
+    }
   }
 
   hit(at: Vector3): void {
@@ -89,6 +99,14 @@ export class CombatFx {
     for (let i = 0; i < 22; i++) this.spawnSpark(at, 8)
     for (let i = 0; i < 14; i++) this.spawnFire(at, 1.1)
     for (let i = 0; i < 12; i++) this.spawnSmoke(at, 3.4)
+  }
+
+  bombBurst(at: Vector3): void {
+    for (let i = 0; i < 26; i++) this.spawnSpark(at, 11)
+    for (let i = 0; i < 22; i++) this.spawnFire(at, 1.6)
+    for (let i = 0; i < 28; i++) this.spawnDirt(at)
+    for (let i = 0; i < 10; i++) this.spawnSmoke(at, 2.8, 1.15 + Math.random() * 0.8)
+    this.flash(at)
   }
 
   igniteWreck(at: Vector3, height: number): void {
@@ -122,6 +140,15 @@ export class CombatFx {
         for (let n = 0; n < 3; n++) this.spawnFire(_puff, 0.4)
       }
     }
+    for (let i = this.flashes.length - 1; i >= 0; i--) {
+      const flash = this.flashes[i]
+      flash.life -= dt
+      flash.light.intensity = Math.max(0, flash.life * 48)
+      if (flash.life > 0) continue
+      flash.light.intensity = 0
+      flash.light.visible = false
+      this.flashes.splice(i, 1)
+    }
     stepSparks(this.sparkList, this.sparkPos, this.sparkCol, dt, SPARK_MAX)
     stepSmoke(this.smokeList, this.smokePos, this.smokeCol, dt, SMOKE_MAX)
     this.sparks.geometry.attributes.position.needsUpdate = true
@@ -143,6 +170,21 @@ export class CombatFx {
       light.userData.lit = false
     }
     this.wrecks.length = 0
+    for (const flash of this.flashes) {
+      flash.light.intensity = 0
+      flash.light.visible = false
+    }
+    this.flashes.length = 0
+  }
+
+  private flash(at: Vector3): void {
+    const used = new Set(this.flashes.map((item) => item.light))
+    const light = this.flashPool.find((item) => !used.has(item))
+    if (!light) return
+    light.visible = true
+    light.intensity = 14
+    light.position.set(at.x, at.y + 1.4, at.z)
+    this.flashes.push({ light, life: 0.22 })
   }
 
   private recycleLight(): PointLight | undefined {
@@ -183,7 +225,7 @@ export class CombatFx {
     })
   }
 
-  private spawnSmoke(at: Vector3, lift: number): void {
+  private spawnSmoke(at: Vector3, lift: number, maxLife?: number): void {
     if (this.smokeList.length >= SMOKE_MAX) return
     const dir = randDir()
     this.smokeList.push({
@@ -195,8 +237,26 @@ export class CombatFx {
       vy: lift * (0.55 + Math.random() * 0.5),
       vz: dir.z * 0.45,
       life: 0,
-      max: 2.6 + Math.random() * 1.6,
+      max: maxLife ?? 2.6 + Math.random() * 1.6,
       size: 0.55,
+    })
+  }
+
+  private spawnDirt(at: Vector3): void {
+    if (this.sparkList.length >= SPARK_MAX) return
+    const dir = randDir()
+    const speed = 6 + Math.random() * 9
+    this.sparkList.push({
+      kind: 'dirt',
+      x: at.x + dir.x * 0.35,
+      y: at.y + 0.2,
+      z: at.z + dir.z * 0.35,
+      vx: dir.x * speed,
+      vy: 5 + Math.random() * 10,
+      vz: dir.z * speed,
+      life: 0,
+      max: 0.7 + Math.random() * 1.2,
+      size: 0.18,
     })
   }
 }
@@ -220,6 +280,10 @@ function stepSparks(
       p.vy += 2.8 * dt
       p.vx *= Math.exp(-2.2 * dt)
       p.vz *= Math.exp(-2.2 * dt)
+    } else if (p.kind === 'dirt') {
+      p.vy -= 28 * dt
+      p.vx *= Math.exp(-1.4 * dt)
+      p.vz *= Math.exp(-1.4 * dt)
     } else {
       p.vy -= 18 * dt
     }
@@ -239,6 +303,9 @@ function stepSparks(
     const t = p.life / p.max
     if (p.kind === 'fire') {
       _c.setRGB(1, 0.42 + (1 - t) * 0.5, 0.06 * (1 - t))
+    } else if (p.kind === 'dirt') {
+      const fade = 1 - t
+      _c.setRGB(0.42 * fade, 0.26 * fade, 0.1 * fade)
     } else {
       _c.setRGB(1, 0.7 - t * 0.4, 0.15)
     }

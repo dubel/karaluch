@@ -23,6 +23,7 @@ export class Hud {
   private readonly arty: HTMLElement
   private readonly artyVeil: HTMLElement
   private readonly rosterCount: HTMLElement
+  private readonly stukaAlert: HTMLElement
   private noticeHandle = 0
 
   constructor() {
@@ -42,6 +43,7 @@ export class Hud {
     this.arty = this.el('#arty')
     this.artyVeil = this.el('#arty-veil')
     this.rosterCount = this.el('#roster-count')
+    this.stukaAlert = this.el('#stuka-alert')
     const artyHelp = this.el('#help-arty')
     if (KID_MODE) {
       artyHelp.replaceChildren()
@@ -128,6 +130,10 @@ export class Hud {
       this.notice.classList.remove('show')
       this.notice.hidden = true
     }, 4200)
+  }
+
+  setStukaAlert(on: boolean): void {
+    this.stukaAlert.classList.toggle('on', on)
   }
 
   showDefeat(report: MissionStats): void {

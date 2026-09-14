@@ -23,9 +23,10 @@ export class FollowCamera {
   private yaw = 0
   private ready = false
   private prevHullYaw = 0
+  private shakeAmp = 0
 
   constructor() {
-    this.camera = new PerspectiveCamera(55, 1, 0.2, 780)
+    this.camera = new PerspectiveCamera(55, 1, 0.2, 920)
   }
 
   get facingYaw(): number {
@@ -36,6 +37,11 @@ export class FollowCamera {
     this.yaw = tank.hullYaw
     this.prevHullYaw = tank.hullYaw
     this.ready = true
+    this.shakeAmp = 0
+  }
+
+  shake(amount: number): void {
+    this.shakeAmp = Math.min(1.4, this.shakeAmp + amount)
   }
 
   resize(width: number, height: number): void {
@@ -104,6 +110,13 @@ export class FollowCamera {
       tank.position.z + cos * lookDist,
     )
     this.camera.lookAt(_look)
+    this.shakeAmp *= Math.exp(-5.8 * dt)
+    if (this.shakeAmp > 0.004) {
+      const s = this.shakeAmp
+      this.camera.position.x += (Math.random() - 0.5) * s * 1.55
+      this.camera.position.y += (Math.random() - 0.5) * s * 1.05
+      this.camera.position.z += (Math.random() - 0.5) * s * 1.55
+    }
   }
 }
 

@@ -11,6 +11,8 @@ const THUNDER_FAR_OGG = new URL('../../assets/sfx/thunder_far.ogg', import.meta.
 const THUNDER_FAR_AAC = new URL('../../assets/sfx/thunder_far.m4a', import.meta.url).href
 const BIRD_OGG = new URL('../../assets/sfx/bird_robin.ogg', import.meta.url).href
 const BIRD_AAC = new URL('../../assets/sfx/bird_robin.m4a', import.meta.url).href
+/** Jericho-Trompete: Alexander / OrangeFreeSounds, CC BY 4.0. */
+const STUKA_SIREN_URL = new URL('../../assets/sfx/stuka_siren.mp3', import.meta.url).href
 
 const SILENT_WAV =
   'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
@@ -68,6 +70,9 @@ export class GameAudio {
   private birdCd = 2
   private ready = false
   private unlocking: Promise<void> | null = null
+  private stukaOn = false
+  private stukaEngineSrc: AudioBufferSourceNode | null = null
+  private stukaEngineGain: GainNode | null = null
 
   async load(): Promise<void> {
     const jobs = [
@@ -86,6 +91,12 @@ export class GameAudio {
         this.raw.set(name, await res.arrayBuffer())
       }),
     )
+    try {
+      const res = await fetch(STUKA_SIREN_URL)
+      if (res.ok) this.raw.set('stukaSiren', await res.arrayBuffer())
+    } catch {
+      /* synth fallback in unlock */
+    }
   }
 
   prime(): void {
@@ -124,6 +135,7 @@ export class GameAudio {
     await ctx.resume()
     if (!this.decoded.has('hit')) this.decoded.set('hit', makeHitBuffer(ctx))
     if (!this.decoded.has('whistle')) this.decoded.set('whistle', makeWhistleBuffer(ctx))
+    if (!this.decoded.has('stukaEngine')) this.decoded.set('stukaEngine', makeStukaEngineBuffer(ctx))
     await Promise.all(
       [...this.raw].map(async ([name, buf]) => {
         if (this.decoded.has(name)) return
@@ -134,6 +146,7 @@ export class GameAudio {
         }
       }),
     )
+    if (!this.decoded.has('stukaSiren')) this.decoded.set('stukaSiren', makeJerichoBuffer(ctx))
     if (!this.engineSrc) this.startEngine()
     if (!this.rainGain) this.startWeatherPads()
     this.ready = true
@@ -174,6 +187,41 @@ export class GameAudio {
 
   artilleryBurst(): void {
     this.play('explode', 0.62, 0.78 + Math.random() * 0.18)
+  }
+
+  bombBurst(): void {
+    this.play('explode', 0.92, 0.68 + Math.random() * 0.18)
+  }
+
+  startStukaRaid(): void {
+    this.prime()
+    if (this.ctx && !this.decoded.has('stukaSiren')) {
+      this.decoded.set('stukaSiren', makeJerichoBuffer(this.ctx))
+    }
+    if (this.ctx && !this.decoded.has('stukaEngine')) {
+      this.decoded.set('stukaEngine', makeStukaEngineBuffer(this.ctx))
+    }
+    this.play('stukaSiren', 0.66, 1)
+    this.startStukaEngine()
+  }
+
+  stopStukaRaid(): void {
+    if (!this.stukaOn) return
+    this.stukaOn = false
+    const ctx = this.ctx
+    const gain = this.stukaEngineGain
+    const src = this.stukaEngineSrc
+    this.stukaEngineGain = null
+    this.stukaEngineSrc = null
+    if (!ctx || !gain) return
+    gain.gain.setTargetAtTime(0, ctx.currentTime, 0.2)
+    window.setTimeout(() => {
+      try {
+        src?.stop()
+      } catch {
+        /* already stopped */
+      }
+    }, 700)
   }
 
   stopEngine(): void {
@@ -220,6 +268,29 @@ export class GameAudio {
     this.engineSrc = src
     this.engineGain = gain
     this.engineFilter = filter
+  }
+
+  private startStukaEngine(): void {
+    const ctx = this.ctx
+    const buf = this.decoded.get('stukaEngine')
+    if (!ctx || !this.master || !buf) return
+    if (this.stukaEngineSrc) this.stopStukaRaid()
+    this.stukaOn = true
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    src.loop = true
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.frequency.value = 1400
+    const gain = ctx.createGain()
+    gain.gain.value = 0
+    src.connect(filter)
+    filter.connect(gain)
+    gain.connect(this.master)
+    src.start()
+    gain.gain.setTargetAtTime(0.34, ctx.currentTime, 0.25)
+    this.stukaEngineSrc = src
+    this.stukaEngineGain = gain
   }
 
   private startWeatherPads(): void {
@@ -314,6 +385,47 @@ function makeWhistleBuffer(ctx: AudioContext): AudioBuffer {
     const env = Math.min(1, i / (sr * 0.08)) * (1 - u) ** 0.42
     const hiss = (Math.random() * 2 - 1) * 0.1
     data[i] = (Math.sin(phase) * 0.72 + hiss) * env
+  }
+  return buf
+}
+
+function makeJerichoBuffer(ctx: AudioContext): AudioBuffer {
+  const sr = ctx.sampleRate
+  const dur = 9.5
+  const n = Math.floor(sr * dur)
+  const buf = ctx.createBuffer(1, n, sr)
+  const data = buf.getChannelData(0)
+  let p1 = 0
+  let p2 = 0
+  let p3 = 0
+  for (let i = 0; i < n; i++) {
+    const u = i / n
+    const dive = u < 0.72 ? u / 0.72 : 1
+    const freq = 1680 - 1180 * dive ** 0.85 + 90 * Math.sin(u * 9)
+    p1 += (2 * Math.PI * freq) / sr
+    p2 += (2 * Math.PI * freq * 1.49) / sr
+    p3 += (2 * Math.PI * freq * 0.51) / sr
+    const attack = Math.min(1, i / (sr * 0.35))
+    const release = u > 0.82 ? (1 - u) / 0.18 : 1
+    const env = attack * release
+    const tone = Math.sin(p1) * 0.55 + Math.sin(p2) * 0.22 + Math.sin(p3) * 0.18
+    data[i] = tone * env
+  }
+  return buf
+}
+
+function makeStukaEngineBuffer(ctx: AudioContext): AudioBuffer {
+  const sr = ctx.sampleRate
+  const n = sr * 2
+  const buf = ctx.createBuffer(1, n, sr)
+  const data = buf.getChannelData(0)
+  let brown = 0
+  for (let i = 0; i < n; i++) {
+    const t = i / sr
+    brown = clampAudio(brown + (Math.random() * 2 - 1) * 0.028, -0.5, 0.5)
+    const prop = Math.sin(2 * Math.PI * 31 * t) * 0.35 + Math.sin(2 * Math.PI * 62 * t) * 0.12
+    const hum = Math.sin(2 * Math.PI * 88 * t) * 0.22 + Math.sin(2 * Math.PI * 176 * t) * 0.08
+    data[i] = brown * 0.55 + prop * (0.45 + brown * 0.2) + hum
   }
   return buf
 }

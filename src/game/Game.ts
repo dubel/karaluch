@@ -25,6 +25,8 @@ import {
   PLAYER_RIG,
   PLAYER_SPAWN,
   ROAD_DIFF_URL,
+  STUKA_DEBUG,
+  STUKA_URL,
   VILLAGE_PROPS,
   WORKSHOP_BARRELS_URL,
   WORKSHOP_HEAL_RATE,
@@ -43,6 +45,7 @@ import { Bot } from './Bot'
 import { ArtilleryBarrage } from './artillery'
 import { Workshop } from './workshop'
 import { GAME_DAY_SECONDS, artilleryCooldownSeconds } from './atmosphere'
+import { StukaRaid, STUKA_BLAST } from './stuka'
 import { releaseIntroMusic } from '../ui/intro'
 import { formatHeldTime, type Hud } from '../ui/hud'
 
@@ -82,6 +85,9 @@ export class Game {
   private artilleryWait = 0
   private artilleryWaitMax = 1
   private readonly barrage = new ArtilleryBarrage()
+  private readonly stukas = new StukaRaid()
+  private stukaAt = nextStukaAt(0)
+  private stukaDebugWait = -1
 
   constructor(canvas: HTMLCanvasElement, hud: Hud) {
     this.hud = hud
@@ -114,6 +120,7 @@ export class Game {
     let perimeterGltf
     let barrelsGltf
     let wrenchGltf
+    let stukaGltf
     try {
       ;[
         playerGltf,
@@ -126,6 +133,7 @@ export class Game {
         perimeterGltf,
         barrelsGltf,
         wrenchGltf,
+        stukaGltf,
       ] = await Promise.all([
         loader.loadAsync(PLAYER_RIG.url),
         loader.loadAsync(BOT_RIG.url),
@@ -137,6 +145,7 @@ export class Game {
         loader.loadAsync(PERIMETER_URL),
         loader.loadAsync(WORKSHOP_BARRELS_URL),
         loader.loadAsync(WORKSHOP_WRENCH_URL),
+        loader.loadAsync(STUKA_URL),
         this.audio.load(),
       ])
     } catch (error) {
@@ -159,6 +168,7 @@ export class Game {
       )
       this.botTemplate = botGltf.scene
       this.playerTemplate = playerGltf.scene
+      this.stukas.setTemplate(stukaGltf.scene)
       this.player = new Tank(
         'player',
         this.playerTemplate.clone(true),
@@ -191,6 +201,7 @@ export class Game {
     releaseIntroMusic()
     this.audio.prime()
     void this.audio.unlock()
+    if (STUKA_DEBUG) this.stukaDebugWait = 0
   }
 
   private restartRound(): void {
@@ -205,6 +216,11 @@ export class Game {
     this.allySeq = 0
     this.artilleryWait = 0
     this.artilleryWaitMax = 1
+    this.stukaAt = nextStukaAt(0)
+    this.stukaDebugWait = STUKA_DEBUG ? 0 : -1
+    this.stukas.clear()
+    this.audio.stopStukaRaid()
+    this.hud.setStukaAlert(false)
     this.barrage.clear()
     this.clearEnemies()
     this.player.reset()
@@ -305,6 +321,7 @@ export class Game {
     for (const unit of this.allies) unit.tank.tickHitSway(dt)
     this.workshop?.tick(dt)
     this.tickArtillery(dt)
+    this.tickStukas(dt)
     this.tracks.update(dt)
     this.fx.update(dt)
     this.updateProjectiles(dt)
@@ -416,6 +433,59 @@ export class Game {
     })
   }
 
+  private tickStukas(dt: number): void {
+    try {
+      this.tickStukasInner(dt)
+    } catch (error) {
+      console.error('Stuka tick', error)
+    }
+  }
+
+  private tickStukasInner(dt: number): void {
+    if (this.playing && this.player?.alive && this.stukaDebugWait >= 0) {
+      this.stukaDebugWait -= dt
+      if (this.stukaDebugWait <= 0) {
+        this.launchStukaRaid()
+        this.stukaDebugWait = this.stukas.active ? -1 : 0.6
+      }
+    }
+    const polish = this.player ? [this.player, ...this.allies.map((unit) => unit.tank)] : []
+    const was = this.stukas.active
+    this.stukas.update(dt, polish, (x, y, z) => this.onStukaBomb(x, y, z))
+    this.hud.setStukaAlert(this.stukas.warning && this.playing && !this.roundOver)
+    if (was && !this.stukas.active) this.audio.stopStukaRaid()
+  }
+
+  private launchStukaRaid(): void {
+    if (!this.player || !this.playing || this.roundOver || this.stukas.active) return
+    const polish = [this.player, ...this.allies.map((unit) => unit.tank)]
+    if (!this.stukas.begin(polish, this.scene)) return
+    this.audio.startStukaRaid()
+    this.stukaAt = nextStukaAt(this.kills)
+  }
+
+  private onStukaBomb(x: number, y: number, z: number): void {
+    const at = new Vector3(x, y + 0.35, z)
+    this.fx.bombBurst(at)
+    this.audio.bombBurst()
+    this.cameraRig.shake(0.52)
+    if (!this.player) return
+    const dmg = this.player.config.maxHp * 0.2
+    const victims = [this.player, ...this.allies.map((unit) => unit.tank)]
+    for (const tank of victims) {
+      if (!tank.alive) continue
+      if (Math.hypot(tank.position.x - x, tank.position.z - z) > STUKA_BLAST) continue
+      const killed = tank.takeDamage(dmg)
+      if (!killed) continue
+      const fxAt = tank.position.clone()
+      fxAt.y += tank.height * 0.55
+      this.audio.explode()
+      this.fx.explode(fxAt)
+      this.fx.igniteWreck(tank.position, tank.height)
+      if (tank.id !== 'player') this.onAllyKilled(tank)
+    }
+  }
+
   private updateProjectiles(dt: number): void {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const shot = this.projectiles[i]
@@ -488,6 +558,7 @@ export class Game {
 
   private onEnemyKilled(tank: Tank): void {
     this.kills += 1
+    if (this.kills >= this.stukaAt) this.launchStukaRaid()
     if (allyArrivesOnKill(this.kills)) this.spawnAlly()
     if (this.wrecks.length >= MAX_WRECKS) {
       const oldest = this.wrecks.shift()
@@ -566,6 +637,9 @@ export class Game {
 
   private clearEnemies(): void {
     this.barrage.clear()
+    this.stukas.clear()
+    this.audio.stopStukaRaid()
+    this.hud.setStukaAlert(false)
     for (const unit of this.force) unit.tank.object.removeFromParent()
     for (const unit of this.allies) unit.tank.object.removeFromParent()
     for (const wreck of this.wrecks) wreck.object.removeFromParent()
@@ -591,6 +665,7 @@ export class Game {
       wavesCleared: this.wavesCleared,
       held: formatHeldTime((this.missionTime * 24) / GAME_DAY_SECONDS),
     })
+    this.hud.setStukaAlert(false)
   }
 
   private resize(): void {
@@ -613,4 +688,8 @@ function closestAlive(from: Tank, candidates: Tank[]): Tank | null {
     }
   }
   return best
+}
+
+function nextStukaAt(kills: number): number {
+  return kills + 4 + Math.floor(Math.random() * 3)
 }

@@ -1,0 +1,359 @@
+import {
+  Box3,
+  CapsuleGeometry,
+  Group,
+  Mesh,
+  MeshStandardMaterial,
+  Object3D,
+  Quaternion,
+  Vector3,
+  type Scene,
+} from 'three'
+import { KID_MODE, STUKA_LENGTH } from './config'
+import { normalizeModel, stripJunk } from './rig'
+import { terrainHeight } from './terrain'
+import type { Tank } from './Tank'
+
+const BOMB_FALL = 3
+const BLAST_RADIUS = 6.1
+const PLANE_LIFE = 12.4
+const START_DIST = 255
+const EXIT_DIST = -195
+const START_ALT = 94
+const DIVE_ALT = 44
+const EXIT_ALT = 102
+const FORMATION = [-20, 0, 20]
+const DROP_U = [0.46, 0.505, 0.55]
+
+const bombGeo = new CapsuleGeometry(0.22, 1.28, 3, 8)
+const bombMat = new MeshStandardMaterial({
+  color: 0x08080a,
+  roughness: 0.58,
+  metalness: 0.28,
+})
+
+const _box = new Box3()
+const _center = new Vector3()
+const _nose = new Vector3()
+const _fwd = new Vector3(0, 0, 1)
+const _vel = new Vector3()
+const _up = new Vector3(0, 1, 0)
+const _q = new Quaternion()
+
+type Plane = {
+  root: Group
+  props: Object3D[]
+  t: number
+  delay: number
+  dirX: number
+  dirZ: number
+  sideX: number
+  sideZ: number
+  offset: number
+  aimX: number
+  aimZ: number
+  dropped: number
+  lastX: number
+  lastY: number
+  lastZ: number
+}
+
+type Bomb = {
+  mesh: Mesh
+  age: number
+  sx: number
+  sy: number
+  sz: number
+  ix: number
+  iy: number
+  iz: number
+}
+
+export class StukaRaid {
+  private readonly craft: { root: Group; props: Object3D[] }[] = []
+  private readonly planes: Plane[] = []
+  private readonly bombs: Bomb[] = []
+  private scene: Scene | null = null
+  private inbound = false
+
+  get active(): boolean {
+    return this.planes.length > 0 || this.bombs.length > 0
+  }
+
+  get warning(): boolean {
+    return this.inbound
+  }
+
+  setTemplate(model: Object3D): void {
+    stripJunk(model)
+    const extra: Object3D[] = []
+    model.traverse((obj) => {
+      if (/^sun/i.test(obj.name) || /^empty/i.test(obj.name)) extra.push(obj)
+      if (/bomb/i.test(obj.name)) obj.visible = false
+      if (/antenna|bombfork|reargun|machinegun/i.test(obj.name)) obj.visible = false
+    })
+    for (const obj of extra) obj.removeFromParent()
+    normalizeModel(model, STUKA_LENGTH)
+    alignNoseToPlusZ(model)
+    for (const item of this.craft) item.root.removeFromParent()
+    this.craft.length = 0
+    for (let i = 0; i < 3; i++) {
+      const visual = model.clone(true)
+      visual.traverse((obj) => {
+        const mesh = obj as Mesh
+        if (!mesh.isMesh) return
+        mesh.castShadow = false
+        mesh.receiveShadow = false
+      })
+      const root = new Group()
+      root.visible = false
+      root.add(visual)
+      this.craft.push({ root, props: findProps(visual) })
+    }
+  }
+
+  begin(polish: Tank[], scene: Scene): boolean {
+    if (this.craft.length < 3 || this.active) return false
+    const living = polish.filter((tank) => tank.alive)
+    if (living.length === 0) return false
+    this.spawnFormation(living, scene)
+    return this.planes.length > 0
+  }
+
+  private spawnFormation(living: Tank[], scene: Scene): void {
+    const yaw = Math.random() * Math.PI * 2
+    const dirX = Math.sin(yaw)
+    const dirZ = Math.cos(yaw)
+    const sideX = dirZ
+    const sideZ = -dirX
+    const target = firstOnApproach(living, dirX, dirZ)
+    const aimX = target.position.x
+    const aimZ = target.position.z
+
+    this.scene = scene
+    this.inbound = true
+    for (let i = 0; i < 3; i++) {
+      const craft = this.craft[i]
+      const offset = FORMATION[i] + (Math.random() - 0.5) * 3
+      const start = samplePath(0, dirX, dirZ, sideX, sideZ, offset, aimX, aimZ)
+      craft.root.visible = true
+      craft.root.position.set(start.x, start.y, start.z)
+      faceVelocity(craft.root, dirX, -0.42, dirZ)
+      scene.add(craft.root)
+      this.planes.push({
+        root: craft.root,
+        props: craft.props,
+        t: 0,
+        delay: i * 0.28,
+        dirX,
+        dirZ,
+        sideX,
+        sideZ,
+        offset,
+        aimX,
+        aimZ,
+        dropped: 0,
+        lastX: start.x,
+        lastY: start.y,
+        lastZ: start.z,
+      })
+    }
+  }
+
+  update(
+    dt: number,
+    polish: Tank[],
+    onBurst: (x: number, y: number, z: number) => void,
+  ): void {
+    for (const plane of this.planes) {
+      if (plane.delay > 0) {
+        plane.delay -= dt
+        continue
+      }
+      plane.t += dt
+      const u = Math.min(1, plane.t / PLANE_LIFE)
+      const pos = samplePath(u, plane.dirX, plane.dirZ, plane.sideX, plane.sideZ, plane.offset, plane.aimX, plane.aimZ)
+      plane.root.position.set(pos.x, pos.y, pos.z)
+      _vel.set(pos.x - plane.lastX, pos.y - plane.lastY, pos.z - plane.lastZ)
+      if (_vel.lengthSq() > 1e-8) faceVelocity(plane.root, _vel.x, _vel.y, _vel.z)
+      plane.lastX = pos.x
+      plane.lastY = pos.y
+      plane.lastZ = pos.z
+      for (const prop of plane.props) prop.rotateZ(dt * 58)
+      while (plane.dropped < 3 && u >= DROP_U[plane.dropped]) {
+        this.releaseBomb(plane, polish)
+        plane.dropped += 1
+      }
+    }
+
+    for (let i = this.planes.length - 1; i >= 0; i--) {
+      if (this.planes[i].t < PLANE_LIFE + 0.2) continue
+      parkCraft(this.planes[i].root)
+      this.planes.splice(i, 1)
+    }
+
+    this.inbound = this.planes.some((plane) => plane.t / PLANE_LIFE < 0.62)
+
+    for (const bomb of this.bombs) {
+      bomb.age += dt
+      const u = Math.min(1, bomb.age / BOMB_FALL)
+      const p = bomb.mesh.position
+      p.x = bomb.sx + (bomb.ix - bomb.sx) * u
+      p.z = bomb.sz + (bomb.iz - bomb.sz) * u
+      p.y = bomb.sy + (bomb.iy - bomb.sy) * u * u
+      _vel.set(bomb.ix - bomb.sx, 2 * u * (bomb.iy - bomb.sy), bomb.iz - bomb.sz)
+      if (_vel.lengthSq() > 1e-8) {
+        bomb.mesh.quaternion.setFromUnitVectors(_up, _vel.normalize())
+      }
+    }
+
+    for (let i = this.bombs.length - 1; i >= 0; i--) {
+      const bomb = this.bombs[i]
+      const ground = terrainHeight(bomb.mesh.position.x, bomb.mesh.position.z) + 0.12
+      if (bomb.age < BOMB_FALL && bomb.mesh.position.y > ground) continue
+      const x = bomb.mesh.position.x
+      const z = bomb.mesh.position.z
+      const y = terrainHeight(x, z)
+      bomb.mesh.removeFromParent()
+      this.bombs.splice(i, 1)
+      onBurst(x, y, z)
+    }
+  }
+
+  clear(): void {
+    for (const plane of this.planes) parkCraft(plane.root)
+    for (const bomb of this.bombs) bomb.mesh.removeFromParent()
+    this.planes.length = 0
+    this.bombs.length = 0
+    this.inbound = false
+    this.scene = null
+  }
+
+  private releaseBomb(plane: Plane, polish: Tank[]): void {
+    const scene = this.scene
+    if (!scene) return
+    const living = polish.filter((tank) => tank.alive)
+    const target = living.length > 0 ? nearestToward(living, plane.root.position.x, plane.root.position.z) : null
+    const jitter = KID_MODE ? 7 + Math.random() * 8 : 3.2 + Math.random() * 5.4
+    const yaw = Math.random() * Math.PI * 2
+    const stick = (plane.dropped - 1) * 3.4
+    let ix: number
+    let iz: number
+    if (target) {
+      ix = target.position.x + Math.sin(yaw) * jitter + plane.dirX * stick
+      iz = target.position.z + Math.cos(yaw) * jitter + plane.dirZ * stick
+    } else {
+      ix = plane.root.position.x + plane.dirX * 18 + Math.sin(yaw) * 8
+      iz = plane.root.position.z + plane.dirZ * 18 + Math.cos(yaw) * 8
+    }
+    const mesh = new Mesh(bombGeo, bombMat)
+    mesh.castShadow = true
+    mesh.position.copy(plane.root.position)
+    mesh.position.y -= 1.1
+    scene.add(mesh)
+    this.bombs.push({
+      mesh,
+      age: 0,
+      sx: mesh.position.x,
+      sy: mesh.position.y,
+      sz: mesh.position.z,
+      ix,
+      iy: terrainHeight(ix, iz) + 0.1,
+      iz,
+    })
+  }
+}
+
+export const STUKA_BLAST = BLAST_RADIUS
+
+function samplePath(
+  u: number,
+  dirX: number,
+  dirZ: number,
+  sideX: number,
+  sideZ: number,
+  offset: number,
+  aimX: number,
+  aimZ: number,
+): { x: number; y: number; z: number } {
+  const t = u * u * (3 - 2 * u)
+  const remaining = START_DIST + (EXIT_DIST - START_DIST) * t
+  const x = aimX - dirX * remaining + sideX * offset
+  const z = aimZ - dirZ * remaining + sideZ * offset
+  let alt = START_ALT
+  if (u < 0.16) {
+    alt = START_ALT
+  } else if (u < 0.5) {
+    const d = (u - 0.16) / 0.34
+    alt = START_ALT + (DIVE_ALT - START_ALT) * d * d
+  } else if (u < 0.62) {
+    alt = DIVE_ALT
+  } else {
+    const p = (u - 0.62) / 0.38
+    alt = DIVE_ALT + (EXIT_ALT - DIVE_ALT) * p * p * (3 - 2 * p)
+  }
+  return { x, y: terrainHeight(x, z) + alt, z }
+}
+
+function firstOnApproach(tanks: Tank[], dirX: number, dirZ: number): Tank {
+  let best = tanks[0]
+  let bestP = best.position.x * dirX + best.position.z * dirZ
+  for (const tank of tanks) {
+    const p = tank.position.x * dirX + tank.position.z * dirZ
+    if (p < bestP) {
+      best = tank
+      bestP = p
+    }
+  }
+  return best
+}
+
+function nearestToward(tanks: Tank[], fromX: number, fromZ: number): Tank {
+  let best = tanks[0]
+  let bestD = Infinity
+  for (const tank of tanks) {
+    const d = Math.hypot(tank.position.x - fromX, tank.position.z - fromZ)
+    if (d < bestD) {
+      best = tank
+      bestD = d
+    }
+  }
+  return best
+}
+
+function parkCraft(root: Group): void {
+  root.visible = false
+  root.removeFromParent()
+}
+
+function findProps(root: Object3D): Object3D[] {
+  const list: Object3D[] = []
+  root.traverse((obj) => {
+    if (/^spinner/i.test(obj.name)) list.push(obj)
+  })
+  return list
+}
+
+function alignNoseToPlusZ(root: Object3D): void {
+  root.updateMatrixWorld(true)
+  let spinner: Object3D | undefined
+  root.traverse((obj) => {
+    if (!spinner && /spinner/i.test(obj.name)) spinner = obj
+  })
+  if (!spinner) return
+  _box.setFromObject(root)
+  _box.getCenter(_center)
+  spinner.getWorldPosition(_nose)
+  _nose.sub(_center)
+  if (_nose.lengthSq() < 1e-6) return
+  _nose.normalize()
+  _q.setFromUnitVectors(_nose, _fwd)
+  root.quaternion.premultiply(_q)
+  root.updateMatrixWorld(true)
+}
+
+function faceVelocity(object: Object3D, vx: number, vy: number, vz: number): void {
+  _vel.set(vx, vy, vz)
+  if (_vel.lengthSq() < 1e-10) return
+  object.quaternion.setFromUnitVectors(_fwd, _vel.normalize())
+}

@@ -117,6 +117,47 @@ canvas#game {
   opacity: 1;
 }
 
+.stuka-alert {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  min-width: min(520px, calc(100% - 40px));
+  padding: 11px 28px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #fff3ee;
+  background: linear-gradient(180deg, #c31812 0%, #7a0d0c 100%);
+  border: 2px solid #ffb8a8;
+  box-shadow: 0 0 28px rgba(180, 12, 8, 0.55), 0 8px 18px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.stuka-alert.on {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  animation: stuka-pulse 0.72s ease-in-out infinite;
+}
+
+@keyframes stuka-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 28px rgba(180, 12, 8, 0.55), 0 8px 18px rgba(0, 0, 0, 0.45);
+  }
+  50% {
+    filter: brightness(1.18);
+    box-shadow: 0 0 38px rgba(255, 40, 20, 0.7), 0 8px 18px rgba(0, 0, 0, 0.45);
+  }
+}
+
 .crosshair {
   position: absolute;
   left: 50%;

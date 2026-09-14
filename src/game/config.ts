@@ -113,6 +113,7 @@ const kidParam = new URLSearchParams(window.location.search).get('kid')
 export const KID_MODE = parseFlag(kidParam) || kidParam?.trim().toLowerCase() === 'stas'
 export const STAS_CONTROLS = kidParam?.trim().toLowerCase() === 'stas'
 export const STUKA_DEBUG = parseFlag(new URLSearchParams(window.location.search).get('stuka'))
+export const SHOW_FPS = parseFlag(new URLSearchParams(window.location.search).get('fps'))
 export const ENEMY_ACCURACY = KID_MODE ? 0.05 : 0.8
 export const ARTY_SHELLS_PER_TANK = 5
 export const ARTY_HIT_CHANCE = 0.8

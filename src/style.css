@@ -209,6 +209,22 @@ canvas#game {
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
+.fps {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 25;
+  margin: 0;
+  padding: 4px 8px;
+  font: 600 13px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.06em;
+  color: #c8f0a8;
+  background: rgba(8, 10, 6, 0.55);
+  border: 1px solid rgba(180, 210, 120, 0.35);
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+}
+
 .hud-bottom {
   position: absolute;
   left: 50%;

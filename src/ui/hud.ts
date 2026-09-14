@@ -1,4 +1,4 @@
-import { KID_MODE } from '../game/config'
+import { KID_MODE, SHOW_FPS } from '../game/config'
 
 export type MissionStats = {
   kills: number
@@ -24,7 +24,9 @@ export class Hud {
   private readonly artyVeil: HTMLElement
   private readonly rosterCount: HTMLElement
   private readonly stukaAlert: HTMLElement
+  private readonly fps: HTMLElement
   private noticeHandle = 0
+  private fpsText = ''
 
   constructor() {
     this.overlay = this.el('#overlay')
@@ -44,6 +46,8 @@ export class Hud {
     this.artyVeil = this.el('#arty-veil')
     this.rosterCount = this.el('#roster-count')
     this.stukaAlert = this.el('#stuka-alert')
+    this.fps = this.el('#fps')
+    this.fps.hidden = !SHOW_FPS
     const artyHelp = this.el('#help-arty')
     if (KID_MODE) {
       artyHelp.replaceChildren()
@@ -134,6 +138,14 @@ export class Hud {
 
   setStukaAlert(on: boolean): void {
     this.stukaAlert.classList.toggle('on', on)
+  }
+
+  setFps(fps: number): void {
+    if (this.fps.hidden) return
+    const text = `${fps} FPS`
+    if (text === this.fpsText) return
+    this.fpsText = text
+    this.fps.textContent = text
   }
 
   showDefeat(report: MissionStats): void {

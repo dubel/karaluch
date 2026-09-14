@@ -27,6 +27,7 @@ import {
   ROAD_DIFF_URL,
   STUKA_DEBUG,
   STUKA_URL,
+  SHOW_FPS,
   VILLAGE_PROPS,
   WORKSHOP_BARRELS_URL,
   WORKSHOP_HEAL_RATE,
@@ -94,6 +95,8 @@ export class Game {
   private readonly stukas = new StukaRaid()
   private stukaAt = nextStukaAt(0)
   private stukaDebugWait = -1
+  private fpsFrames = 0
+  private fpsAcc = 0
 
   constructor(canvas: HTMLCanvasElement, hud: Hud) {
     this.hud = hud
@@ -189,6 +192,7 @@ export class Game {
     }
     this.scene.add(this.player.object, this.tracks.mesh, this.fx.sparks, this.fx.smoke)
     this.fx.prepare(this.scene)
+    this.stukas.prime(this.scene)
     this.player.sitOnTerrain()
     this.cameraRig.reset(this.player)
     this.hud.readyToPlay()
@@ -248,9 +252,20 @@ export class Game {
 
   private loop = (): void => {
     requestAnimationFrame(this.loop)
-    const dt = Math.min(this.clock.getDelta(), 0.08)
+    const raw = this.clock.getDelta()
+    const dt = Math.min(raw, 0.08)
     this.update(dt)
     this.renderer.render(this.scene, this.cameraRig.camera)
+    if (SHOW_FPS) this.tickFps(raw)
+  }
+
+  private tickFps(rawDt: number): void {
+    this.fpsFrames += 1
+    this.fpsAcc += rawDt
+    if (this.fpsAcc < 0.25) return
+    this.hud.setFps(Math.round(this.fpsFrames / this.fpsAcc))
+    this.fpsFrames = 0
+    this.fpsAcc = 0
   }
 
   private update(dt: number): void {

@@ -3,7 +3,7 @@ import {
   CapsuleGeometry,
   Group,
   Mesh,
-  MeshStandardMaterial,
+  MeshBasicMaterial,
   Object3D,
   Quaternion,
   Vector3,
@@ -27,11 +27,8 @@ const DROP_U = [0.58, 0.63, 0.68]
 const STAGGER = [0, 0.35, 0.7]
 
 const bombGeo = new CapsuleGeometry(0.22, 1.28, 3, 8)
-const bombMat = new MeshStandardMaterial({
-  color: 0x08080a,
-  roughness: 0.58,
-  metalness: 0.28,
-})
+const bombMat = new MeshBasicMaterial({ color: 0x08080a })
+const BOMB_POOL = 9
 
 const _box = new Box3()
 const _center = new Vector3()
@@ -74,6 +71,7 @@ export class StukaRaid {
   private readonly craft: { root: Group; props: Object3D[] }[] = []
   private readonly planes: Plane[] = []
   private readonly bombs: Bomb[] = []
+  private readonly bombPool: Mesh[] = []
   private scene: Scene | null = null
   private inbound = false
 
@@ -83,6 +81,23 @@ export class StukaRaid {
 
   get warning(): boolean {
     return this.inbound
+  }
+
+  prime(scene: Scene): void {
+    this.scene = scene
+    if (this.bombPool.length === 0) {
+      for (let i = 0; i < BOMB_POOL; i++) {
+        const mesh = new Mesh(bombGeo, bombMat)
+        mesh.visible = false
+        mesh.castShadow = false
+        mesh.receiveShadow = false
+        mesh.frustumCulled = true
+        this.bombPool.push(mesh)
+      }
+    }
+    for (const mesh of this.bombPool) {
+      if (mesh.parent !== scene) scene.add(mesh)
+    }
   }
 
   setTemplate(model: Object3D): void {
@@ -216,7 +231,7 @@ export class StukaRaid {
       const x = bomb.mesh.position.x
       const z = bomb.mesh.position.z
       const y = terrainHeight(x, z)
-      bomb.mesh.removeFromParent()
+      bomb.mesh.visible = false
       this.bombs.splice(i, 1)
       onBurst(x, y, z)
     }
@@ -224,18 +239,17 @@ export class StukaRaid {
 
   clear(): void {
     for (const plane of this.planes) parkCraft(plane.root)
-    for (const bomb of this.bombs) bomb.mesh.removeFromParent()
+    for (const bomb of this.bombs) bomb.mesh.visible = false
     this.planes.length = 0
     this.bombs.length = 0
     this.inbound = false
-    this.scene = null
   }
 
   private releaseBomb(plane: Plane, polish: Tank[]): void {
-    const scene = this.scene
-    if (!scene) return
-    const living = polish.filter((tank) => tank.alive)
-    const target = living.length > 0 ? nearestToward(living, plane.root.position.x, plane.root.position.z) : null
+    if (!this.scene) return
+    const mesh = this.bombPool.find((item) => !item.visible)
+    if (!mesh) return
+    const target = nearestAlive(polish, plane.root.position.x, plane.root.position.z)
     const jitter = KID_MODE ? 7 + Math.random() * 8 : 3.2 + Math.random() * 5.4
     const yaw = Math.random() * Math.PI * 2
     const stick = (plane.dropped - 1) * 3.4
@@ -248,11 +262,9 @@ export class StukaRaid {
       ix = plane.root.position.x + plane.dirX * 18 + Math.sin(yaw) * 8
       iz = plane.root.position.z + plane.dirZ * 18 + Math.cos(yaw) * 8
     }
-    const mesh = new Mesh(bombGeo, bombMat)
-    mesh.castShadow = false
+    mesh.visible = true
     mesh.position.copy(plane.root.position)
     mesh.position.y -= 1.1
-    scene.add(mesh)
     this.bombs.push({
       mesh,
       age: 0,
@@ -307,10 +319,11 @@ function firstOnApproach(tanks: Tank[], dirX: number, dirZ: number): Tank {
   return best
 }
 
-function nearestToward(tanks: Tank[], fromX: number, fromZ: number): Tank {
-  let best = tanks[0]
+function nearestAlive(tanks: Tank[], fromX: number, fromZ: number): Tank | null {
+  let best: Tank | null = null
   let bestD = Infinity
   for (const tank of tanks) {
+    if (!tank.alive) continue
     const d = Math.hypot(tank.position.x - fromX, tank.position.z - fromZ)
     if (d < bestD) {
       best = tank

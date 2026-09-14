@@ -78,22 +78,22 @@ export class Input {
 
   throttle(): number {
     let v = 0
-    if (this.keys.has('ArrowUp')) v += 1
-    if (this.keys.has('ArrowDown')) v -= 1
-    return v
-  }
-
-  elevate(): number {
-    let v = 0
     if (this.keys.has('KeyW')) v += 1
     if (this.keys.has('KeyS')) v -= 1
     return v
   }
 
+  elevate(): number {
+    let v = 0
+    if (this.keys.has('ArrowUp')) v += 1
+    if (this.keys.has('ArrowDown')) v -= 1
+    return v
+  }
+
   steer(): number {
     let v = 0
-    if (this.keys.has('ArrowLeft')) v += 1
-    if (this.keys.has('ArrowRight')) v -= 1
+    if (this.keys.has('KeyA')) v += 1
+    if (this.keys.has('KeyD')) v -= 1
     return v
   }
 
@@ -102,8 +102,10 @@ export class Input {
       event.code === 'Space' ||
       event.code === 'ArrowUp' ||
       event.code === 'ArrowDown' ||
-      event.code === 'ArrowLeft' ||
-      event.code === 'ArrowRight'
+      event.code === 'KeyW' ||
+      event.code === 'KeyA' ||
+      event.code === 'KeyS' ||
+      event.code === 'KeyD'
     ) {
       event.preventDefault()
     }
@@ -115,7 +117,7 @@ export class Input {
       this.fireHeld = true
     }
     if (event.code === 'KeyR') this.restart = true
-    if (event.code === 'KeyA') this.artillery = true
+    if (event.code === 'KeyQ') this.artillery = true
     if (event.code === 'KeyM') this.markers = true
   }
 

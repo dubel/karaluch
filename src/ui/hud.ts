@@ -46,7 +46,7 @@ export class Hud {
     if (KID_MODE) {
       artyHelp.replaceChildren()
       const key = document.createElement('kbd')
-      key.textContent = 'A'
+      key.textContent = 'Q'
       artyHelp.append(key, ' nalot artyleryjski (co 2 godziny czasu gry)')
     }
   }

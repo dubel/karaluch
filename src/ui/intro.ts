@@ -21,9 +21,9 @@ import {
   SRGBColorSpace,
   WebGLRenderer,
 } from 'three'
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { BOT_RIG, PLAYER_RIG } from '../game/config'
 import { applyRig, normalizeModel, stripJunk } from '../game/rig'
+import { dismissBoot, type IntroAssets } from './boot'
 
 const CRAWL = `Jest 19 września 1939 roku. Trwa brutalna agresja niemieckiej III Rzeszy na Rzeczpospolitą. Zaledwie dwa dni temu bohaterska armia polska otrzymała śmiertelny cios w plecy — od wschodu granice przekroczyły wojska Związku Sowieckiego.
 
@@ -48,9 +48,9 @@ function marchUrl(): string {
 
 let introMusic: HTMLAudioElement | null = null
 
-export function playIntro(): Promise<void> {
+export function playIntro(assets: IntroAssets): Promise<void> {
   const intro = new Intro()
-  return intro.play()
+  return intro.play(assets)
 }
 
 /** Pause the crawl march. Safe to call more than once; iOS often ignores pause() outside a gesture. */
@@ -157,32 +157,27 @@ class Intro {
     introMusic = this.music
   }
 
-  play(): Promise<void> {
+  play(assets: IntroAssets): Promise<void> {
     document.body.classList.add('intro-open')
     this.resize()
+    this.mountModels(assets)
+    this.bg.render(this.bgScene, this.camera)
+    this.fg.render(this.fgScene, this.camera)
+    dismissBoot()
     window.addEventListener('resize', this.resize)
     window.addEventListener('keydown', this.onKey)
     this.root.addEventListener('pointerup', this.onPointer)
     const track = this.root.querySelector('.intro-crawl-track')
     track?.addEventListener('animationend', () => this.finish())
     void this.music.play().catch(() => undefined)
-    void this.loadModels().catch((error: unknown) => {
-      console.error(error)
-    })
     this.loop()
     return new Promise((resolve) => {
       this.resolve = resolve
     })
   }
 
-  private async loadModels(): Promise<void> {
-    const loader = new GLTFLoader()
-    const [tksGltf, pzGltf] = await Promise.all([
-      loader.loadAsync(PLAYER_RIG.url),
-      loader.loadAsync(BOT_RIG.url),
-    ])
-    if (this.finished) return
-    const tks = applyRig(tksGltf.scene, PLAYER_RIG).root
+  private mountModels(assets: IntroAssets): void {
+    const tks = applyRig(assets.tks, PLAYER_RIG).root
     tks.traverse((child) => {
       const mesh = child as Mesh
       if (!mesh.isMesh) return
@@ -192,14 +187,14 @@ class Intro {
     tks.rotation.y = 0.18
     this.fgScene.add(tks)
 
-    stripJunk(pzGltf.scene)
+    stripJunk(assets.pz)
     const wrecks = [
       { x: -5.4, z: -3.2, yaw: 0.62, roll: 0.44, pitch: 0.1, scale: 1.55 },
       { x: 5.8, z: -4.6, yaw: -1.05, roll: -0.5, pitch: 0.16, scale: 1.85 },
       { x: 0.8, z: -10.4, yaw: 2.45, roll: 0.26, pitch: -0.14, scale: 2.2 },
     ]
     for (const spot of wrecks) {
-      const wreck = pzGltf.scene.clone(true)
+      const wreck = assets.pz.clone(true)
       normalizeModel(wreck, BOT_RIG.targetLength * spot.scale)
       charWreck(wreck)
       wreck.position.set(spot.x, 0, spot.z)

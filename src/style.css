@@ -398,10 +398,79 @@ kbd {
   background: #3b4720;
 }
 
+body.boot-open .hud,
+body.boot-open .overlay,
 body.intro-open .hud,
 body.intro-open .overlay {
   visibility: hidden;
   pointer-events: none;
+}
+
+#boot {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: #120c08;
+  color: #ead9b8;
+}
+
+.boot-card {
+  width: min(420px, 86vw);
+  text-align: center;
+}
+
+.boot-card h1 {
+  margin: 0;
+  letter-spacing: 0.28em;
+  font-weight: 600;
+  font-size: 28px;
+}
+
+.boot-label {
+  margin: 14px 0 22px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  font-size: 13px;
+  color: #d4c09a;
+  animation: boot-pulse 1.8s ease-in-out infinite;
+}
+
+.boot-bar {
+  height: 4px;
+  background: #2a2016;
+  border: 1px solid #5a4a32;
+}
+
+#boot-fill {
+  width: 0;
+  height: 100%;
+  background: #e6c48a;
+  transition: width 0.18s linear;
+}
+
+.boot-status {
+  margin: 14px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: #b89a72;
+}
+
+#boot.boot-out {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.32s ease;
+}
+
+@keyframes boot-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 #intro {

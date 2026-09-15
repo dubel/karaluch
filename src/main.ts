@@ -3,10 +3,14 @@ import { Game } from './game/Game'
 import { Hud } from './ui/hud'
 import { bootFailed, preloadIntroAssets } from './ui/boot'
 import { playIntro } from './ui/intro'
+import { initLang, mountLangSwitch, t } from './i18n'
+
+initLang()
+mountLangSwitch()
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')
 if (!canvas) {
-  throw new Error('Brak canvas #game')
+  throw new Error(t().boot.missingCanvas)
 }
 
 const hud = new Hud()
@@ -20,6 +24,6 @@ preloadIntroAssets()
   .catch((error: unknown) => {
     console.error(error)
     const message = error instanceof Error ? error.message : String(error)
-    bootFailed(`Nie udało się załadować. ${message}`)
-    hud.setStatus(`Nie udało się załadować modeli. ${message}`)
+    bootFailed(t().boot.failed(message))
+    hud.setStatus(t().overlay.loadFailed(message))
   })

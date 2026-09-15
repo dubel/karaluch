@@ -362,6 +362,7 @@ canvas#game {
   display: grid;
   place-items: center;
   background: rgba(8, 10, 7, 0.78);
+  pointer-events: none;
 }
 
 .overlay.hidden {
@@ -374,6 +375,7 @@ canvas#game {
   border: 1px solid #6d7a48;
   background: #14180f;
   text-align: center;
+  pointer-events: auto;
 }
 
 .overlay-card h1 {
@@ -597,6 +599,7 @@ body.intro-open .overlay {
   right: 0;
   bottom: 18px;
   margin: 0;
+  padding: 0 108px;
   text-align: center;
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -628,4 +631,48 @@ body.intro-open .overlay {
   50% {
     opacity: 0.85;
   }
+}
+
+#lang-switch {
+  position: fixed;
+  right: 16px;
+  bottom: 14px;
+  z-index: 90;
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+#lang-switch.hidden {
+  display: none;
+}
+
+#lang-switch button {
+  width: 52px;
+  height: 34px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(232, 237, 212, 0.7);
+  border-radius: 2px;
+  background: #012169;
+  cursor: pointer;
+  opacity: 0.72;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+#lang-switch button svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#lang-switch button.on {
+  opacity: 1;
+  border-color: #e8c48a;
+  box-shadow: 0 0 0 1px #e8c48a, 0 2px 12px rgba(0, 0, 0, 0.55);
+}
+
+#lang-switch button:focus-visible {
+  outline: 2px solid #e8c48a;
+  outline-offset: 2px;
 }

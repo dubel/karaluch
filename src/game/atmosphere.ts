@@ -17,6 +17,7 @@ import {
 } from 'three'
 import type { WindClock } from './foliage'
 import { KID_MODE } from './config'
+import { t } from '../i18n'
 
 export const atmosWetness = { value: 0 }
 
@@ -29,7 +30,6 @@ type WeatherSpec = {
   rain: Range
   wind: Range
   dark: Range
-  label: string
   weight: number
 }
 
@@ -42,11 +42,11 @@ type WeatherSample = {
 }
 
 const WEATHER: Record<WeatherId, WeatherSpec> = {
-  clear: { cover: [0.02, 0.2], rain: [0, 0], wind: [0.2, 0.62], dark: [0, 0.08], label: 'bezchmurnie', weight: 44 },
-  clouds: { cover: [0.26, 0.6], rain: [0, 0.04], wind: [0.38, 0.9], dark: [0.04, 0.2], label: 'zachmurzenie', weight: 30 },
-  overcast: { cover: [0.62, 0.88], rain: [0, 0.14], wind: [0.5, 1.05], dark: [0.22, 0.46], label: 'pochmurno', weight: 14 },
-  rain: { cover: [0.78, 0.96], rain: [0.42, 0.88], wind: [0.85, 1.45], dark: [0.38, 0.58], label: 'deszcz', weight: 8 },
-  storm: { cover: [0.9, 1], rain: [0.82, 1], wind: [1.45, 2.15], dark: [0.55, 0.78], label: 'burza', weight: 4 },
+  clear: { cover: [0.02, 0.2], rain: [0, 0], wind: [0.2, 0.62], dark: [0, 0.08], weight: 44 },
+  clouds: { cover: [0.26, 0.6], rain: [0, 0.04], wind: [0.38, 0.9], dark: [0.04, 0.2], weight: 30 },
+  overcast: { cover: [0.62, 0.88], rain: [0, 0.14], wind: [0.5, 1.05], dark: [0.22, 0.46], weight: 14 },
+  rain: { cover: [0.78, 0.96], rain: [0.42, 0.88], wind: [0.85, 1.45], dark: [0.38, 0.58], weight: 8 },
+  storm: { cover: [0.9, 1], rain: [0.82, 1], wind: [1.45, 2.15], dark: [0.55, 0.78], weight: 4 },
 }
 
 const IDS = Object.keys(WEATHER) as WeatherId[]
@@ -161,9 +161,10 @@ function rollWeather(exclude: WeatherId | null, forced?: WeatherId): WeatherSamp
 
 function weatherLabel(id: WeatherId, rain: number, mist: number): string {
   const foggy = mist > 0.42
-  if (foggy && rain > 0.45) return id === 'storm' ? 'burza i mgła' : 'deszcz i mgła'
-  if (foggy) return 'mgła'
-  return WEATHER[id].label
+  const s = t().weather
+  if (foggy && rain > 0.45) return id === 'storm' ? s.stormFog : s.rainFog
+  if (foggy) return s.fog
+  return s[id]
 }
 
 function bodyDir(hour: number, decl: number, into: Vector3): number {
@@ -182,7 +183,7 @@ function bodyDir(hour: number, decl: number, into: Vector3): number {
 }
 
 export class Atmosphere {
-  label = 'wrzesień'
+  label = ''
   wetness = 0
   rain = 0
   wind = 0.5

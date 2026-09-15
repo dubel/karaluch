@@ -1,6 +1,7 @@
 import { Cache, type Object3D } from 'three'
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { BOT_RIG, PLAYER_RIG } from '../game/config'
+import { t, onLangChange } from '../i18n'
 
 Cache.enabled = true
 
@@ -70,5 +71,12 @@ function paintPercent(p: number): void {
   const status = document.getElementById('boot-status')
   const pct = Math.round(Math.max(0, Math.min(1, p)) * 100)
   if (fill) fill.style.width = `${pct}%`
-  if (status) status.textContent = `Ładowanie… ${pct}%`
+  if (status) status.textContent = t().boot.loading(pct)
 }
+
+onLangChange(() => {
+  const fill = document.getElementById('boot-fill')
+  if (!fill) return
+  const pct = Math.round(Number.parseFloat(fill.style.width) || 0)
+  paintPercent(pct / 100)
+})

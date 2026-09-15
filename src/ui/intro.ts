@@ -23,19 +23,8 @@ import {
 } from 'three'
 import { BOT_RIG, PLAYER_RIG } from '../game/config'
 import { applyRig, normalizeModel, stripJunk } from '../game/rig'
+import { onLangChange, t } from '../i18n'
 import { dismissBoot, type IntroAssets } from './boot'
-
-const CRAWL = `Jest 19 września 1939 roku. Trwa brutalna agresja niemieckiej III Rzeszy na Rzeczpospolitą. Zaledwie dwa dni temu bohaterska armia polska otrzymała śmiertelny cios w plecy — od wschodu granice przekroczyły wojska Związku Sowieckiego.
-
-Mimo beznadziejnej sytuacji, Polacy nie składają broni. Wczoraj w leśnej potyczce pod Pociechą polska tankietka dokonała niemożliwego, niszcząc niemiecką kolumnę pancerną. W płonącym Panzer IV zginął niemiecki książę Wiktor IV von Ratibor.
-
-Tajemnicą tego sukcesu jest niska, zwrotna tankietka TKS, uzbrojona w zabójcze działko kalibru 20 mm. Wehrmacht pogardliwie nazywa te pojazdy „karaluchami”. Polscy czołgiści przyjęli ten przydomek z dumą — i zamierzają udowodnić, jak bolesne potrafi być ich ukąszenie.
-
-Obejmujesz dowodzenie nad maszyną w plutonie kaprala podchorążego Edmunda Orlika. Niemiecka machina pancerna rusza właśnie do kontrataku na wieś Sieraków, próbując odciąć drogę odwrotu polskim oddziałom zmierzającym do Warszawy.
-
-Twój cel: jak najdłużej osłaniać odwrót sojuszników. Nie pokonasz ich wszystkich — ale każda zniszczona maszyna to minuta życia dla tych, którzy idą do Warszawy.
-
-Powodzenia, żołnierzu!`
 
 const MARCH_OGG = new URL('../../assets/music/enemy_marches.ogg', import.meta.url).href
 const MARCH_AAC = new URL('../../assets/music/enemy_marches.m4a', import.meta.url).href
@@ -102,6 +91,7 @@ class Intro {
   private finished = false
   private tapped = false
   private sawTouch = false
+  private unsubLang: () => void = () => undefined
   private resolve: () => void = () => undefined
 
   constructor() {
@@ -112,12 +102,12 @@ class Intro {
       <canvas id="intro-fg"></canvas>
       <div class="intro-vignette"></div>
       <div class="intro-crawl">
-        <div class="intro-crawl-track">
-          ${CRAWL.split('\n\n').map((p) => `<p>${p}</p>`).join('')}
-        </div>
+        <div class="intro-crawl-track"></div>
       </div>
-      <p class="intro-skip">Wciśnij dowolny klawisz by pominąć</p>`
+      <p class="intro-skip"></p>`
     document.getElementById('app')?.append(this.root)
+    this.paintCopy()
+    this.unsubLang = onLangChange(() => this.paintCopy())
     this.bgCanvas = this.root.querySelector('#intro-bg') as HTMLCanvasElement
     this.fgCanvas = this.root.querySelector('#intro-fg') as HTMLCanvasElement
 
@@ -253,6 +243,19 @@ class Intro {
     this.fg.setSize(w, h)
   }
 
+  private paintCopy(): void {
+    const s = t()
+    const track = this.root.querySelector('.intro-crawl-track')
+    const skip = this.root.querySelector('.intro-skip')
+    if (track) {
+      track.innerHTML = s.intro.crawl
+        .split('\n\n')
+        .map((p) => `<p>${p}</p>`)
+        .join('')
+    }
+    if (skip) skip.textContent = s.intro.skip
+  }
+
   private finish(): void {
     if (this.finished) return
     this.finished = true
@@ -260,6 +263,7 @@ class Intro {
     window.removeEventListener('resize', this.resize)
     window.removeEventListener('keydown', this.onKey)
     this.root.removeEventListener('pointerup', this.onPointer)
+    this.unsubLang()
     stopIntroMusic()
     this.root.classList.add('intro-out')
     this.bg.dispose()

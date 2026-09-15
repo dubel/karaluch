@@ -59,7 +59,8 @@ import { GAME_DAY_SECONDS, artilleryCooldownSeconds } from './atmosphere'
 import { StukaRaid, STUKA_BLAST } from './stuka'
 import { pondWading, pondWaterY, tickPond, POND } from './pond'
 import { releaseIntroMusic } from '../ui/intro'
-import { formatHeldTime, type Hud } from '../ui/hud'
+import { type Hud } from '../ui/hud'
+import { t } from '../i18n'
 
 type CombatUnit = { tank: Tank; ai: Bot }
 
@@ -386,7 +387,7 @@ export class Game {
       if (this.input.consumeArtillery()) this.callArtillery()
       if (this.input.consumeMarkers()) {
         const on = toggleBeacons()
-        this.hud.flash(on ? 'Znaczniki włączone' : 'Znaczniki wyłączone')
+        this.hud.flash(on ? t().flash.markersOn : t().flash.markersOff)
       }
       if (repairing) {
         this.player.heal(this.player.config.maxHp * WORKSHOP_HEAL_RATE * dt)
@@ -518,7 +519,7 @@ export class Game {
     if (this.artilleryWait > 0) return
     const targets = this.force.map((unit) => unit.tank).filter((tank) => tank.alive)
     if (targets.length === 0) {
-      this.hud.flash('Brak celów dla nalotu')
+      this.hud.flash(t().flash.noArtyTargets)
       return
     }
     const wait = artilleryCooldownSeconds(this.missionTime)
@@ -526,14 +527,14 @@ export class Game {
     this.artilleryWaitMax = wait
     this.barrage.start(targets, this.scene)
     this.audio.incomingBarrage()
-    this.hud.flash('Nalot artyleryjski!')
+    this.hud.flash(t().flash.artyIncoming)
   }
 
   private tickArtillery(dt: number): void {
     const wasCharging = this.artilleryWait > 0
     this.artilleryWait = Math.max(0, this.artilleryWait - dt)
     if (wasCharging && this.artilleryWait <= 0 && this.playing && this.player?.alive) {
-      this.hud.flash('Artyleria gotowa')
+      this.hud.flash(t().flash.artyReady)
     }
     this.barrage.update(dt, (x, y, z, tank) => {
       _fxAt.set(x, y + 0.4, z)
@@ -740,7 +741,7 @@ export class Game {
     tank.sitOnTerrain()
     this.scene.add(tank.object)
     this.allies.push({ tank, ai: new Bot(tank, slot, 2, 'ally') })
-    this.hud.flash('Karaluch z plutonu Orlika dołącza do osłony!')
+    this.hud.flash(t().flash.allyJoins)
   }
 
   private clearEnemies(): void {
@@ -811,7 +812,7 @@ export class Game {
     this.hud.showDefeat({
       kills: this.kills,
       wavesCleared: this.wavesCleared,
-      held: formatHeldTime((this.missionTime * 24) / GAME_DAY_SECONDS),
+      heldHours: (this.missionTime * 24) / GAME_DAY_SECONDS,
     })
     this.hud.setStukaAlert(false)
   }

@@ -29,10 +29,15 @@ import {
   STUKA_URL,
   SHOW_FPS,
   POND_DEBUG,
+  CHAPEL_DEBUG,
+  CHAPEL_LANE,
   VILLAGE_PROPS,
   BOAT_URL,
   REEDS_URL,
   WHARF_URL,
+  CHURCH_URL,
+  STONE_WALL_URL,
+  TOMBSTONES_URL,
   WORKSHOP_BARRELS_URL,
   WORKSHOP_HEAL_RATE,
   WORKSHOP_WRENCH_URL,
@@ -142,6 +147,9 @@ export class Game {
     let wharfGltf
     let boatGltf
     let reedsGltf
+    let churchGltf
+    let wallGltf
+    let tombGltf
     try {
       ;[
         playerGltf,
@@ -159,6 +167,9 @@ export class Game {
         wharfGltf,
         boatGltf,
         reedsGltf,
+        churchGltf,
+        wallGltf,
+        tombGltf,
       ] = await Promise.all([
         loader.loadAsync(PLAYER_RIG.url),
         loader.loadAsync(ENEMY_RIGS[0].url),
@@ -175,6 +186,9 @@ export class Game {
         loader.loadAsync(WHARF_URL),
         loader.loadAsync(BOAT_URL),
         loader.loadAsync(REEDS_URL),
+        loader.loadAsync(CHURCH_URL),
+        loader.loadAsync(STONE_WALL_URL),
+        loader.loadAsync(TOMBSTONES_URL),
         this.audio.load(),
       ])
     } catch (error) {
@@ -186,6 +200,7 @@ export class Game {
       for (let i = 0; i < VILLAGE_PROPS.length; i++) {
         this.arena.addVillageProp(villageGltfs[i].scene, VILLAGE_PROPS[i])
       }
+      this.arena.addChapel(churchGltf.scene, wallGltf.scene, tombGltf.scene)
       this.arena.addFoliage(foliageGltf.scene, grassGltf.scene)
       this.arena.addReeds(reedsGltf.scene)
       this.arena.addWharf(wharfGltf.scene)
@@ -210,11 +225,18 @@ export class Game {
         this.playerTemplate.clone(true),
         PLAYER_RIG,
         new Vector3(
-          POND_DEBUG ? POND.x + 4 : PLAYER_SPAWN.x,
+          POND_DEBUG ? POND.x + 4 : CHAPEL_DEBUG ? CHAPEL_LANE[0].x - 4 : PLAYER_SPAWN.x,
           0,
-          POND_DEBUG ? POND.z + POND.rz * 1.45 : PLAYER_SPAWN.z,
+          POND_DEBUG ? POND.z + POND.rz * 1.45 : CHAPEL_DEBUG ? CHAPEL_LANE[0].z + 6 : PLAYER_SPAWN.z,
         ),
-        POND_DEBUG ? Math.PI : PLAYER_SPAWN.yaw,
+        POND_DEBUG
+          ? Math.PI
+          : CHAPEL_DEBUG
+            ? Math.atan2(
+                CHAPEL_LANE[CHAPEL_LANE.length - 1].x - CHAPEL_LANE[0].x,
+                CHAPEL_LANE[CHAPEL_LANE.length - 1].z - CHAPEL_LANE[0].z,
+              )
+            : PLAYER_SPAWN.yaw,
         'pl',
       )
     } catch (error) {

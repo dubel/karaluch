@@ -20,6 +20,7 @@ import { sowFoliage, sowReeds, type WindClock } from './foliage'
 import { installPerimeter } from './perimeter'
 import { createRoadMesh, installRoadGrade } from './road'
 import { addPond, installPondBasin, paintBeachVertices, placeBoat, placeWharf, POND } from './pond'
+import { placeChapel } from './chapel'
 import { normalizeModel, stripJunk } from './rig'
 import { displaceTerrain } from './terrain'
 import { Atmosphere, atmosWetness } from './atmosphere'
@@ -161,6 +162,10 @@ export class Arena {
 
   addBoat(model: Object3D): void {
     placeBoat(this.scene, model, this.obstacles, this.cameraBlockers)
+  }
+
+  addChapel(church: Object3D, wall: Object3D, tombs: Object3D): void {
+    placeChapel(this.scene, church, wall, tombs, this.obstacles, this.cameraBlockers)
   }
 }
 

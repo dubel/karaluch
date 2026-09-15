@@ -9,7 +9,7 @@ import {
   SRGBColorSpace,
   type Texture,
 } from 'three'
-import { ARENA_HALF } from './config'
+import { ARENA_HALF, CHAPEL_LANE } from './config'
 import { rawTerrainHeight, setTerrainGrade, terrainHeight } from './terrain'
 
 export const ROAD_HALF = 1.75
@@ -69,7 +69,7 @@ const BRANCH_NE: Vec2[] = [
   { x: EDGE, z: EDGE },
 ]
 
-const PATHS = [TRUNK, BRANCH_NW, BRANCH_NE]
+const PATHS = [TRUNK, BRANCH_NW, BRANCH_NE, CHAPEL_LANE]
 const PATH_POINTS = PATHS.map((path) => resample(sampleSpline(path, 14), 0.45))
 const SEGMENTS: Segment[] = []
 const GRADES: PathGrade[] = []
@@ -115,9 +115,12 @@ export function createRoadMesh(map: Texture): Group {
   })
   const group = new Group()
   group.name = 'field-road'
-  for (const pts of PATH_POINTS) {
-    group.add(new Mesh(buildRut(pts, -RUT_OFFSET, RUT_HALF), mat))
-    group.add(new Mesh(buildRut(pts, RUT_OFFSET, RUT_HALF), mat))
+  for (let p = 0; p < PATH_POINTS.length; p++) {
+    const field = p === PATHS.length - 1
+    const off = field ? RUT_OFFSET * 0.78 : RUT_OFFSET
+    const half = field ? RUT_HALF * 0.82 : RUT_HALF
+    group.add(new Mesh(buildRut(PATH_POINTS[p], -off, half), mat))
+    group.add(new Mesh(buildRut(PATH_POINTS[p], off, half), mat))
   }
   return group
 }

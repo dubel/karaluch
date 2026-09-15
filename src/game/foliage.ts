@@ -13,7 +13,7 @@ import {
 } from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { Aabb } from './collision'
-import { ARENA_HALF, BOT_SPAWN, PLAYER_SPAWN, TREE_HEIGHT, WINDMILL_PROP, WORKSHOP, WORKSHOP_RADIUS } from './config'
+import { ARENA_HALF, BOT_SPAWN, CEMETERY, CHAPEL, PLAYER_SPAWN, TREE_HEIGHT, WINDMILL_PROP, WORKSHOP, WORKSHOP_RADIUS } from './config'
 import { roadDistance } from './road'
 import { nearWharf, pondU, POND } from './pond'
 import { stripJunk } from './rig'
@@ -395,6 +395,8 @@ function scatter(
       if (Math.hypot(px - PLAYER_SPAWN.x, pz - PLAYER_SPAWN.z) < opts.spawn) continue
       if (Math.hypot(px - BOT_SPAWN.x, pz - BOT_SPAWN.z) < opts.spawn) continue
       if (Math.hypot(px - WORKSHOP.x, pz - WORKSHOP.z) < Math.max(opts.spawn * 0.55, WORKSHOP_RADIUS + 2.5)) continue
+      if (Math.hypot(px - CHAPEL.x, pz - CHAPEL.z) < 16) continue
+      if (Math.abs(px - CEMETERY.x) < CEMETERY.hx + 3.2 && Math.abs(pz - CEMETERY.z) < CEMETERY.hz + 3.2) continue
       const roadClear = opts.road ?? 0
       if (roadClear > 0 && roadDistance(px, pz) < roadClear) continue
       if (pondU(px, pz) < 1.16) continue

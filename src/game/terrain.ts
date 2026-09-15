@@ -1,5 +1,5 @@
 import type { BufferGeometry } from 'three'
-import { ARENA_HALF, WINDMILL_PROP } from './config'
+import { ARENA_HALF, CEMETERY, CHAPEL, WINDMILL_PROP } from './config'
 
 const HOUSE_FLAT = 12
 const HOUSE_BLEND = 22
@@ -28,6 +28,8 @@ function buildMounds(): Mound[] {
       const pz = z + (hash2(z, x, 9.1) - 0.5) * cell * 0.72
       if (Math.hypot(px, pz) < 30) continue
       if (Math.hypot(px - WINDMILL_PROP.x, pz - WINDMILL_PROP.z) < 18) continue
+      if (Math.abs(px - CEMETERY.x) < CEMETERY.hx + 10 && Math.abs(pz - CEMETERY.z) < CEMETERY.hz + 10) continue
+      if (Math.hypot(px - CHAPEL.x, pz - CHAPEL.z) < 16) continue
       if (Math.max(Math.abs(px), Math.abs(pz)) > limit) continue
       mounds.push({
         x: px,
@@ -37,10 +39,24 @@ function buildMounds(): Mound[] {
       })
     }
   }
+  mounds.push(
+    { x: CEMETERY.x + CEMETERY.hx + 18, z: CEMETERY.z - 2, h: 3.7, r: 15.5 },
+    { x: CEMETERY.x + CEMETERY.hx + 12, z: CEMETERY.z + 17, h: 3.3, r: 13.2 },
+    { x: CEMETERY.x + 4, z: CEMETERY.z - CEMETERY.hz - 15, h: 3.1, r: 12.4 },
+    { x: CHAPEL.x + 20, z: CHAPEL.z + 16, h: 2.9, r: 11.6 },
+  )
   return mounds
 }
 
 const MOUNDS = buildMounds()
+
+function chapelFlat(x: number, z: number): number {
+  const dx = Math.max(Math.abs(x - CEMETERY.x) - CEMETERY.hx, 0)
+  const dz = Math.max(Math.abs(z - CEMETERY.z) - CEMETERY.hz, 0)
+  const yard = 1 - smoothstep(1.2, 7.5, Math.hypot(dx, dz))
+  const church = 1 - smoothstep(6.5, 13, Math.hypot(x - CHAPEL.x, z - CHAPEL.z))
+  return Math.max(yard, church)
+}
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)))
@@ -61,7 +77,8 @@ function moundHeight(x: number, z: number): number {
 export function rawTerrainHeight(x: number, z: number): number {
   const house = 1 - smoothstep(HOUSE_FLAT, HOUSE_BLEND, Math.hypot(x, z))
   const mill = 1 - smoothstep(MILL_FLAT, MILL_BLEND, Math.hypot(x - WINDMILL_PROP.x, z - WINDMILL_PROP.z))
-  const village = Math.max(house, mill)
+  const chapel = chapelFlat(x, z)
+  const village = Math.max(house, mill, chapel)
   const edge = Math.max(Math.abs(x), Math.abs(z))
   const wall = smoothstep(ARENA_HALF - 12, ARENA_HALF, edge)
   const n =

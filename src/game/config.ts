@@ -109,6 +109,20 @@ export const ROAD_DIFF_URL = new URL('../../assets/textures/muddy_tracks_diff_2k
 export const WHARF_URL = new URL('../../assets/the_wharf___lake_sea.glb', import.meta.url).href
 export const BOAT_URL = new URL('../../assets/old_boat.glb', import.meta.url).href
 export const REEDS_URL = new URL('../../assets/reeds_low_poly.glb', import.meta.url).href
+export const CHURCH_URL = new URL('../../assets/old_wooden_church.glb', import.meta.url).href
+export const STONE_WALL_URL = new URL('../../assets/stone_wall__low_poly__game_ready.glb', import.meta.url).href
+export const TOMBSTONES_URL = new URL('../../assets/tombstones_low_poly.glb', import.meta.url).href
+export const CHURCH_LENGTH = 11.4
+/** Wooden chapel east of the SE trunk, north of the parish cemetery. */
+export const CHAPEL = { x: 64, z: -18, yaw: 0 }
+/** Parish cemetery in the hollow east of the trunk, west of the rim hills. */
+export const CEMETERY = { x: 90, z: -40, hx: 13.75, hz: 11, gateWidth: 5.5 }
+/** Field track from the main road to the cemetery gate. */
+export const CHAPEL_LANE = [
+  { x: 48.5, z: -38 },
+  { x: 64, z: -28 },
+  { x: CEMETERY.x - CEMETERY.hx - 0.6, z: CEMETERY.z },
+]
 export const TREE_HEIGHT = 9.5
 export const TKS_LENGTH = 2.6
 export const PLAYER_SPAWN = { x: -96, z: 88, yaw: Math.PI * 0.72 }
@@ -128,6 +142,7 @@ export const STAS_CONTROLS = kidParam?.trim().toLowerCase() === 'stas'
 export const STUKA_DEBUG = parseFlag(new URLSearchParams(window.location.search).get('stuka'))
 export const SHOW_FPS = parseFlag(new URLSearchParams(window.location.search).get('fps'))
 export const POND_DEBUG = parseFlag(new URLSearchParams(window.location.search).get('pond'))
+export const CHAPEL_DEBUG = parseFlag(new URLSearchParams(window.location.search).get('chapel'))
 export const DESCRIBE = parseFlag(new URLSearchParams(window.location.search).get('describe'))
 export const ENEMY_ACCURACY = KID_MODE ? 0.05 : 0.8
 export const ARTY_SHELLS_PER_TANK = 5

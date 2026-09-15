@@ -1,5 +1,5 @@
 import type { BufferGeometry } from 'three'
-import { ARENA_HALF, CEMETERY, CHAPEL, WINDMILL_PROP } from './config'
+import { ARENA_HALF, CEMETERY, CHAPEL, CHAPEL_LANE, WINDMILL_PROP } from './config'
 
 const HOUSE_FLAT = 12
 const HOUSE_BLEND = 22
@@ -30,6 +30,7 @@ function buildMounds(): Mound[] {
       if (Math.hypot(px - WINDMILL_PROP.x, pz - WINDMILL_PROP.z) < 18) continue
       if (Math.abs(px - CEMETERY.x) < CEMETERY.hx + 10 && Math.abs(pz - CEMETERY.z) < CEMETERY.hz + 10) continue
       if (Math.hypot(px - CHAPEL.x, pz - CHAPEL.z) < 16) continue
+      if (Math.hypot(px - CHAPEL_LANE[0].x, pz - CHAPEL_LANE[0].z) < 18) continue
       if (Math.max(Math.abs(px), Math.abs(pz)) > limit) continue
       mounds.push({
         x: px,
@@ -55,7 +56,22 @@ function chapelFlat(x: number, z: number): number {
   const dz = Math.max(Math.abs(z - CEMETERY.z) - CEMETERY.hz, 0)
   const yard = 1 - smoothstep(1.2, 7.5, Math.hypot(dx, dz))
   const church = 1 - smoothstep(6.5, 13, Math.hypot(x - CHAPEL.x, z - CHAPEL.z))
-  return Math.max(yard, church)
+  const fork = 1 - smoothstep(5, 16, Math.hypot(x - CHAPEL_LANE[0].x, z - CHAPEL_LANE[0].z))
+  return Math.max(yard, church, fork, laneFlat(x, z))
+}
+
+function laneFlat(x: number, z: number): number {
+  let best = 1e9
+  for (let i = 0; i < CHAPEL_LANE.length - 1; i++) {
+    const a = CHAPEL_LANE[i]
+    const b = CHAPEL_LANE[i + 1]
+    const dx = b.x - a.x
+    const dz = b.z - a.z
+    const len2 = dx * dx + dz * dz
+    const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / Math.max(len2, 1e-4)))
+    best = Math.min(best, Math.hypot(x - a.x - dx * t, z - a.z - dz * t))
+  }
+  return 1 - smoothstep(2.2, 8.5, best)
 }
 
 function smoothstep(edge0: number, edge1: number, x: number): number {

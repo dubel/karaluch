@@ -115,12 +115,9 @@ export function createRoadMesh(map: Texture): Group {
   })
   const group = new Group()
   group.name = 'field-road'
-  for (let p = 0; p < PATH_POINTS.length; p++) {
-    const field = p === PATHS.length - 1
-    const off = field ? RUT_OFFSET * 0.78 : RUT_OFFSET
-    const half = field ? RUT_HALF * 0.82 : RUT_HALF
-    group.add(new Mesh(buildRut(PATH_POINTS[p], -off, half), mat))
-    group.add(new Mesh(buildRut(PATH_POINTS[p], off, half), mat))
+  for (const pts of PATH_POINTS) {
+    group.add(new Mesh(buildRut(pts, -RUT_OFFSET, RUT_HALF), mat))
+    group.add(new Mesh(buildRut(pts, RUT_OFFSET, RUT_HALF), mat))
   }
   return group
 }

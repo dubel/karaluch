@@ -117,10 +117,11 @@ export const CHURCH_LENGTH = 11.4
 export const CHAPEL = { x: 64, z: -18, yaw: 0 }
 /** Parish cemetery in the hollow east of the trunk, west of the rim hills. */
 export const CEMETERY = { x: 90, z: -40, hx: 13.75, hz: 11, gateWidth: 5.5 }
-/** Field track from the main road to the cemetery gate. */
+/** Field track from the chapel fork on the SE trunk to the cemetery gate. */
 export const CHAPEL_LANE = [
-  { x: 48.5, z: -38 },
-  { x: 64, z: -28 },
+  { x: 56, z: -44 },
+  { x: 66, z: -26 },
+  { x: 74, z: -32 },
   { x: CEMETERY.x - CEMETERY.hx - 0.6, z: CEMETERY.z },
 ]
 export const TREE_HEIGHT = 9.5
@@ -166,6 +167,10 @@ export function allyArrivesOnKill(kills: number): boolean {
   return kills >= 9 && (kills - 9) % 3 === 0
 }
 
+/** Shared hull cruise; TKS is 25% faster so it can always outrun both Axis tanks. */
+const CRUISE = 9
+const CRUISE_REVERSE = 4.2
+
 export const PLAYER_RIG: RigConfig = {
   url: playerUrl,
   targetLength: TKS_LENGTH,
@@ -175,8 +180,8 @@ export const PLAYER_RIG: RigConfig = {
   gunPitchMin: -0.12,
   gunPitchMax: 0.32,
   maxHp: 9,
-  moveSpeed: 9,
-  reverseSpeed: 4.2,
+  moveSpeed: CRUISE * 1.25,
+  reverseSpeed: CRUISE_REVERSE * 1.25,
   turnSpeed: 3.7,
   turretTurnSpeed: 2.4,
   fireCooldown: 0.85 * 0.75,
@@ -203,8 +208,8 @@ export const BOT_RIG: RigConfig = {
   gunPitchMin: -0.1,
   gunPitchMax: 0.28,
   maxHp: 3,
-  moveSpeed: 9 / 1.25,
-  reverseSpeed: 4.2 / 1.25,
+  moveSpeed: CRUISE,
+  reverseSpeed: CRUISE_REVERSE,
   turnSpeed: 1.35,
   turretTurnSpeed: 1.85,
   fireCooldown: 1.55,
@@ -226,8 +231,8 @@ export const BOT_RIG_PZ2: RigConfig = {
   gunPitchMin: -0.08,
   gunPitchMax: 0.22,
   maxHp: 3,
-  moveSpeed: 9 / 1.25,
-  reverseSpeed: 4.2 / 1.25,
+  moveSpeed: CRUISE,
+  reverseSpeed: CRUISE_REVERSE,
   turnSpeed: 1.4,
   turretTurnSpeed: 2.05,
   fireCooldown: 1.55,

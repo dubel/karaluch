@@ -216,6 +216,7 @@ export class Atmosphere {
   private flashFollow = 0
   private time = 0
   private thunderWait = 0
+  private thunderClose = false
   private thunderEvent: { volume: number; far: boolean } | null = null
   private readonly flashDir = new Vector3(1, 0.08, 0)
 
@@ -468,9 +469,10 @@ export class Atmosphere {
     if (this.thunderWait > 0) {
       this.thunderWait -= dt
       if (this.thunderWait <= 0) {
+        const close = this.thunderClose
         this.thunderEvent = {
-          volume: 0.32 + Math.random() * 0.5,
-          far: rain < 0.85 || wind < 1.4,
+          volume: close ? 0.84 + Math.random() * 0.16 : 0.5 + Math.random() * 0.22,
+          far: !close,
         }
       }
     }
@@ -482,9 +484,11 @@ export class Atmosphere {
     const az = Math.random() * Math.PI * 2
     this.flashDir.set(Math.sin(az), 0.04 + Math.random() * 0.1, Math.cos(az)).normalize()
     this.flash = stormy ? 0.7 + Math.random() * 0.7 : 0.35 + Math.random() * 0.4
+    const close = stormy && this.flash > 0.9
     this.flashFollow = 0.06 + Math.random() * 0.1
     this.flashCd = stormy ? 2.4 + Math.random() * 7 : 8 + Math.random() * 16
-    this.thunderWait = 0.35 + Math.random() * (stormy ? 1.8 : 2.8)
+    this.thunderWait = close ? 0.16 + Math.random() * 0.4 : 0.55 + Math.random() * 1.5
+    this.thunderClose = close
   }
 }
 

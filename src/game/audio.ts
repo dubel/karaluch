@@ -243,7 +243,11 @@ export class GameAudio {
   }
 
   thunder(event: { volume: number; far: boolean }): void {
-    this.play(event.far ? 'thunderFar' : 'thunderNear', event.volume, 0.88 + Math.random() * 0.2)
+    if (this.ctx && !this.decoded.has('thunderNear')) {
+      this.decoded.set('thunderNear', makeThunderCrackBuffer(this.ctx))
+    }
+    this.play('thunderNear', event.volume, 0.92 + Math.random() * 0.1, 0, 0.55)
+    if (event.far) this.play('thunderFar', event.volume * 0.55, 0.88 + Math.random() * 0.12, 0.08, 0.3)
   }
 
   tickAmbience(dt: number, hour: number, rain: number): void {
@@ -308,7 +312,7 @@ export class GameAudio {
     this.windGain = loopPad(ctx, this.master, makeWindBuffer(ctx), 0, 0.92, 760)
   }
 
-  private play(name: string, volume: number, rate: number, delay = 0): void {
+  private play(name: string, volume: number, rate: number, delay = 0, offset = 0): void {
     const ctx = this.ctx
     const buf = this.decoded.get(name)
     if (!ctx || !this.master || !buf) return
@@ -320,7 +324,8 @@ export class GameAudio {
     gain.gain.value = volume
     src.connect(gain)
     gain.connect(this.master)
-    src.start(ctx.currentTime + delay)
+    const off = offset > 0 && buf.duration > offset + 0.4 ? offset : 0
+    src.start(ctx.currentTime + delay, off)
   }
 }
 
@@ -451,6 +456,24 @@ function makeHitBuffer(ctx: AudioContext): AudioBuffer {
       Math.sin(2 * Math.PI * 1870 * t) * 0.12
     const grit = (Math.random() * 2 - 1) * Math.exp(-t * 22) * 0.35
     data[i] = (clang + grit) * env
+  }
+  return buf
+}
+
+function makeThunderCrackBuffer(ctx: AudioContext): AudioBuffer {
+  const sr = ctx.sampleRate
+  const n = Math.floor(sr * 1.6)
+  const buf = ctx.createBuffer(1, n, sr)
+  const data = buf.getChannelData(0)
+  let brown = 0
+  for (let i = 0; i < n; i++) {
+    const t = i / sr
+    const crack = Math.min(1, t / 0.012) * Math.exp(-t * 9)
+    const rumble = Math.min(1, t / 0.08) * Math.exp(-t * 1.6)
+    brown = clampAudio(brown + (Math.random() * 2 - 1) * 0.04, -0.55, 0.55)
+    const snap = (Math.random() * 2 - 1) * crack * 0.7
+    const boom = Math.sin(2 * Math.PI * (48 + t * 18) * t) * rumble * 0.45
+    data[i] = snap + brown * rumble * 0.85 + boom
   }
   return buf
 }

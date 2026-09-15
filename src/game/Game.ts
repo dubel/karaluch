@@ -15,7 +15,7 @@ import { FollowCamera } from './camera'
 import { hullCoverAabb, pointHitsObb, raycastObstacles, type Aabb } from './collision'
 import {
   ARENA_HALF,
-  BOT_RIG,
+  ENEMY_RIGS,
   ENEMY_SPAWNS,
   FOLIAGE_URL,
   GRASS_PATCH_URL,
@@ -38,6 +38,7 @@ import {
   WORKSHOP_WRENCH_URL,
   allyArrivesOnKill,
   waveEnemyCount,
+  type RigConfig,
 } from './config'
 import { Input } from './input'
 import { Projectile } from './Projectile'
@@ -83,7 +84,7 @@ export class Game {
   private arena!: Arena
   private workshop!: Workshop
   private player!: Tank
-  private botTemplate!: Object3D
+  private botTemplates: { model: Object3D; rig: RigConfig }[] = []
   private playerTemplate!: Object3D
   private playing = false
   private roundOver = false
@@ -128,6 +129,7 @@ export class Game {
     const texLoader = new TextureLoader(manager)
     let playerGltf
     let botGltf
+    let pz2Gltf
     let houseGltf
     let villageGltfs
     let foliageGltf
@@ -144,6 +146,7 @@ export class Game {
       ;[
         playerGltf,
         botGltf,
+        pz2Gltf,
         houseGltf,
         villageGltfs,
         foliageGltf,
@@ -158,7 +161,8 @@ export class Game {
         reedsGltf,
       ] = await Promise.all([
         loader.loadAsync(PLAYER_RIG.url),
-        loader.loadAsync(BOT_RIG.url),
+        loader.loadAsync(ENEMY_RIGS[0].url),
+        loader.loadAsync(ENEMY_RIGS[1].url),
         loader.loadAsync(HOUSE_URL),
         Promise.all(VILLAGE_PROPS.map((prop) => loader.loadAsync(prop.url))),
         loader.loadAsync(FOLIAGE_URL),
@@ -195,7 +199,10 @@ export class Game {
         this.arena.cameraBlockers,
       )
       this.arena.indexCollision()
-      this.botTemplate = botGltf.scene
+      this.botTemplates = [
+        { model: botGltf.scene, rig: ENEMY_RIGS[0] },
+        { model: pz2Gltf.scene, rig: ENEMY_RIGS[1] },
+      ]
       this.playerTemplate = playerGltf.scene
       this.stukas.setTemplate(stukaGltf.scene)
       this.player = new Tank(
@@ -679,10 +686,11 @@ export class Game {
   private spawnEnemy(slot: number, waveSize: number): void {
     const pose = ENEMY_SPAWNS[slot % ENEMY_SPAWNS.length]
     const jitter = (Math.random() - 0.5) * 6.5 + slot * 3.2
+    const pick = this.botTemplates[Math.floor(Math.random() * this.botTemplates.length)]
     const tank = new Tank(
       `enemy-${this.enemySeq}`,
-      this.botTemplate.clone(true),
-      BOT_RIG,
+      pick.model.clone(true),
+      pick.rig,
       new Vector3(pose.x + jitter, 0, pose.z + jitter),
       pose.yaw,
     )

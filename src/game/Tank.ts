@@ -1,14 +1,19 @@
 import {
+  CanvasTexture,
   Color,
   ConeGeometry,
   Group,
+  LinearFilter,
   Mesh,
   MeshStandardMaterial,
   Object3D,
   Quaternion,
+  Sprite,
+  SpriteMaterial,
+  SRGBColorSpace,
   Vector3,
 } from 'three'
-import type { RigConfig } from './config'
+import { DESCRIBE, type RigConfig } from './config'
 import { applyRig, type TankRig } from './rig'
 import { clampToBounds, collidesAny, obbHitsObb, type ObstacleSet } from './collision'
 import { Projectile } from './Projectile'
@@ -40,10 +45,61 @@ const BEACON_ALLY = new MeshStandardMaterial({
 })
 const _beaconWorld = new Quaternion()
 let beaconsOn = true
+const labelMats = new Map<string, SpriteMaterial>()
 
 export function toggleBeacons(): boolean {
   beaconsOn = !beaconsOn
   return beaconsOn
+}
+
+function labelMaterial(text: string): SpriteMaterial {
+  const hit = labelMats.get(text)
+  if (hit) return hit
+  const dpr = 2
+  const fontSize = 22
+  const padX = 10
+  const padY = 5
+  const probe = document.createElement('canvas').getContext('2d')
+  if (!probe) throw new Error('Brak canvas 2d')
+  probe.font = `600 ${fontSize}px "Segoe UI", system-ui, sans-serif`
+  const textW = Math.ceil(probe.measureText(text).width)
+  const w = textW + padX * 2
+  const h = fontSize + padY * 2
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.ceil(w * dpr)
+  canvas.height = Math.ceil(h * dpr)
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Brak canvas 2d')
+  ctx.scale(dpr, dpr)
+  ctx.font = probe.font
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillStyle = 'rgba(10, 12, 8, 0.78)'
+  ctx.beginPath()
+  ctx.roundRect(0.5, 0.5, w - 1, h - 1, 6)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(232, 196, 138, 0.7)'
+  ctx.lineWidth = 1
+  ctx.stroke()
+  ctx.fillStyle = '#f3e6c0'
+  ctx.fillText(text, w / 2, h / 2 + 0.5)
+  const map = new CanvasTexture(canvas)
+  map.colorSpace = SRGBColorSpace
+  map.generateMipmaps = false
+  map.minFilter = LinearFilter
+  map.magFilter = LinearFilter
+  const mat = new SpriteMaterial({
+    map,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    sizeAttenuation: true,
+    toneMapped: false,
+    fog: false,
+  })
+  mat.userData.aspect = w / h
+  labelMats.set(text, mat)
+  return mat
 }
 
 function wrapPi(angle: number): number {
@@ -136,6 +192,7 @@ export class Tank {
       }
     })
     if (id !== 'player') this.attachBeacon()
+    if (DESCRIBE) this.attachLabel()
   }
 
   get position(): Vector3 {
@@ -217,6 +274,23 @@ export class Tank {
       this.applyHullPose()
     }
     this.tickBeacon(dt)
+  }
+
+  private attachLabel(): void {
+    const text = this.config.label
+    if (!text) return
+    const sprite = new Sprite(labelMaterial(text))
+    const worldH = 0.2
+    const aspect = Number(sprite.material.userData.aspect) || 4
+    sprite.scale.set(worldH * aspect, worldH, 1)
+    sprite.center.set(0.5, 0)
+    sprite.position.y = this.height * 0.58 + 0.22
+    sprite.name = `Describe:${text}`
+    sprite.renderOrder = 8
+    sprite.frustumCulled = false
+    sprite.castShadow = false
+    sprite.receiveShadow = false
+    this.object.add(sprite)
   }
 
   private attachBeacon(): void {

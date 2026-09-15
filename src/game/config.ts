@@ -21,10 +21,20 @@ export type RigConfig = {
   trackOffset?: number
   /** Ground-mark width matching one caterpillar. */
   trackWidth?: number
+  /**
+   * Vertex filter in native model space. Failing triangles stay on the hull
+   * so bow MG / stowage in a merged "turret" mesh do not rotate.
+   */
+  keepTurretVertex?: (x: number, y: number, z: number) => boolean
+  /** Native-space filter for the main barrel, parented to the gun pivot. */
+  keepGunVertex?: (x: number, y: number, z: number) => boolean
+  /** Short name shown above the hull when `?describe=true`. */
+  label?: string
 }
 
 const playerUrl = new URL('../../assets/tks_20mm_tankette.glb', import.meta.url).href
 const botUrl = new URL('../../assets/tank_pz_kpfw_iii_ausf_b__1937.glb', import.meta.url).href
+const botPz2Url = new URL('../../assets/panzer_ii_pz.kpfw._ii.glb', import.meta.url).href
 export const STUKA_URL = new URL('../../assets/junkers_ju_87_stuka.glb', import.meta.url).href
 export const STUKA_LENGTH = 12.2
 export const HOUSE_URL = new URL(
@@ -118,6 +128,7 @@ export const STAS_CONTROLS = kidParam?.trim().toLowerCase() === 'stas'
 export const STUKA_DEBUG = parseFlag(new URLSearchParams(window.location.search).get('stuka'))
 export const SHOW_FPS = parseFlag(new URLSearchParams(window.location.search).get('fps'))
 export const POND_DEBUG = parseFlag(new URLSearchParams(window.location.search).get('pond'))
+export const DESCRIBE = parseFlag(new URLSearchParams(window.location.search).get('describe'))
 export const ENEMY_ACCURACY = KID_MODE ? 0.05 : 0.8
 export const ARTY_SHELLS_PER_TANK = 5
 export const ARTY_HIT_CHANCE = 0.8
@@ -159,6 +170,7 @@ export const PLAYER_RIG: RigConfig = {
   cameraDistance: 11,
   trackOffset: 0.63,
   trackWidth: 0.2,
+  label: 'TKS',
 }
 
 export const BOT_RIG: RigConfig = {
@@ -168,14 +180,12 @@ export const BOT_RIG: RigConfig = {
     'Cube.001',
     'Cube.002',
     'Cube.003',
-    'Cube.005',
     'Cube.012',
     'Cube.013',
-    'Cube.015',
   ],
-  gunNames: ['Cube.002', 'Cube.005'],
+  gunNames: ['Cube.005'],
   turretYawLimit: Math.PI,
-  gunPitchMin: -0.34,
+  gunPitchMin: -0.1,
   gunPitchMax: 0.28,
   maxHp: 3,
   moveSpeed: 9 / 1.4,
@@ -189,7 +199,42 @@ export const BOT_RIG: RigConfig = {
   visualYaw: Math.PI / 2,
   trackOffset: 1.12,
   trackWidth: 0.38,
+  label: 'PzKpfw III',
 }
+
+export const BOT_RIG_PZ2: RigConfig = {
+  url: botPz2Url,
+  targetLength: 4.8,
+  turretNames: ['Pz II_Turret_n_Tools_0'],
+  gunNames: ['Pz II_Turret_n_Tools_0_gun'],
+  turretYawLimit: Math.PI,
+  gunPitchMin: -0.08,
+  gunPitchMax: 0.22,
+  maxHp: 3,
+  moveSpeed: 9 / 1.4,
+  reverseSpeed: 4.2 / 1.4,
+  turnSpeed: 1.4,
+  turretTurnSpeed: 2.05,
+  fireCooldown: 1.55,
+  damage: 1,
+  projectileSpeed: 78,
+  cameraDistance: 14,
+  visualYaw: Math.PI / 2,
+  trackOffset: 0.92,
+  trackWidth: 0.32,
+  keepTurretVertex: (x, y, z) => {
+    if (x < -0.68) return false
+    const d = Math.hypot(x + 0.52, y + 0.06)
+    if (z > 0.58 && d < 0.88) return true
+    if (d < 0.64 && z > 0.5) return true
+    return false
+  },
+  keepGunVertex: (x, y, z) =>
+    x < -0.68 && y < -0.1 && y > -0.58 && z > 0.44 && z < 0.74,
+  label: 'PzKpfw II',
+}
+
+export const ENEMY_RIGS: RigConfig[] = [BOT_RIG, BOT_RIG_PZ2]
 
 function parseFlag(value: string | null): boolean {
   if (!value) return false

@@ -27,7 +27,7 @@ import { dismissBoot, type IntroAssets } from './boot'
 
 const CRAWL = `Jest 19 września 1939 roku. Trwa brutalna agresja niemieckiej III Rzeszy na Rzeczpospolitą. Zaledwie dwa dni temu bohaterska armia polska otrzymała śmiertelny cios w plecy — od wschodu granice przekroczyły wojska Związku Sowieckiego.
 
-Mimo beznadziejnej sytuacji, Polacy nie składają broni. Wczoraj w leśnej potyczce pod Pociechą polska tankietka dokonała niemożliwego, niszcząc niemiecką kolumnę pancerną. W płonącym potworze Panzer IV zginął niemiecki as, książę Wiktor IV von Ratibor.
+Mimo beznadziejnej sytuacji, Polacy nie składają broni. Wczoraj w leśnej potyczce pod Pociechą polska tankietka dokonała niemożliwego, niszcząc niemiecką kolumnę pancerną. W płonącym Panzer IV zginął niemiecki książę Wiktor IV von Ratibor.
 
 Tajemnicą tego sukcesu jest niska, zwrotna tankietka TKS, uzbrojona w zabójcze działko kalibru 20 mm. Wehrmacht pogardliwie nazywa te pojazdy „karaluchami”. Polscy czołgiści przyjęli ten przydomek z dumą — i zamierzają udowodnić, jak bolesne potrafi być ich ukąszenie.
 

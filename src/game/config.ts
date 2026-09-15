@@ -188,8 +188,8 @@ export const BOT_RIG: RigConfig = {
   gunPitchMin: -0.1,
   gunPitchMax: 0.28,
   maxHp: 3,
-  moveSpeed: 9 / 1.4,
-  reverseSpeed: 4.2 / 1.4,
+  moveSpeed: 9 / 1.25,
+  reverseSpeed: 4.2 / 1.25,
   turnSpeed: 1.35,
   turretTurnSpeed: 1.85,
   fireCooldown: 1.55,
@@ -211,8 +211,8 @@ export const BOT_RIG_PZ2: RigConfig = {
   gunPitchMin: -0.08,
   gunPitchMax: 0.22,
   maxHp: 3,
-  moveSpeed: 9 / 1.4,
-  reverseSpeed: 4.2 / 1.4,
+  moveSpeed: 9 / 1.25,
+  reverseSpeed: 4.2 / 1.25,
   turnSpeed: 1.4,
   turretTurnSpeed: 2.05,
   fireCooldown: 1.55,
@@ -223,10 +223,10 @@ export const BOT_RIG_PZ2: RigConfig = {
   trackOffset: 0.92,
   trackWidth: 0.32,
   keepTurretVertex: (x, y, z) => {
-    if (x < -0.68) return false
     const d = Math.hypot(x + 0.52, y + 0.06)
-    if (z > 0.58 && d < 0.88) return true
-    if (d < 0.64 && z > 0.5) return true
+    if (z > 0.46) return true
+    if (d < 0.72 && z > 0.38) return true
+    if (x < -0.35 && Math.abs(y) < 0.35 && z > 0.4) return true
     return false
   },
   keepGunVertex: (x, y, z) =>

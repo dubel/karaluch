@@ -745,7 +745,7 @@ void main() {
   vec3 seed = position;
   vec3 drift = vec3(
     seed.x + uTime * (0.12 * uWind.x),
-    seed.y + uTime * (0.55 + seed.x * 0.65),
+    seed.y - uTime * (0.7 + seed.x * 0.5),
     seed.z + uTime * (0.12 * uWind.z)
   );
   vec3 q = fract(drift);

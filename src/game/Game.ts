@@ -28,7 +28,11 @@ import {
   STUKA_DEBUG,
   STUKA_URL,
   SHOW_FPS,
+  POND_DEBUG,
   VILLAGE_PROPS,
+  BOAT_URL,
+  REEDS_URL,
+  WHARF_URL,
   WORKSHOP_BARRELS_URL,
   WORKSHOP_HEAL_RATE,
   WORKSHOP_WRENCH_URL,
@@ -47,6 +51,7 @@ import { ArtilleryBarrage } from './artillery'
 import { Workshop } from './workshop'
 import { GAME_DAY_SECONDS, artilleryCooldownSeconds } from './atmosphere'
 import { StukaRaid, STUKA_BLAST } from './stuka'
+import { pondContains, pondWaterY, tickPond, POND } from './pond'
 import { releaseIntroMusic } from '../ui/intro'
 import { formatHeldTime, type Hud } from '../ui/hud'
 
@@ -97,6 +102,7 @@ export class Game {
   private stukaDebugWait = -1
   private fpsFrames = 0
   private fpsAcc = 0
+  private fordAcc = 0
 
   constructor(canvas: HTMLCanvasElement, hud: Hud) {
     this.hud = hud
@@ -130,6 +136,9 @@ export class Game {
     let barrelsGltf
     let wrenchGltf
     let stukaGltf
+    let wharfGltf
+    let boatGltf
+    let reedsGltf
     try {
       ;[
         playerGltf,
@@ -143,6 +152,9 @@ export class Game {
         barrelsGltf,
         wrenchGltf,
         stukaGltf,
+        wharfGltf,
+        boatGltf,
+        reedsGltf,
       ] = await Promise.all([
         loader.loadAsync(PLAYER_RIG.url),
         loader.loadAsync(BOT_RIG.url),
@@ -155,6 +167,9 @@ export class Game {
         loader.loadAsync(WORKSHOP_BARRELS_URL),
         loader.loadAsync(WORKSHOP_WRENCH_URL),
         loader.loadAsync(STUKA_URL),
+        loader.loadAsync(WHARF_URL),
+        loader.loadAsync(BOAT_URL),
+        loader.loadAsync(REEDS_URL),
         this.audio.load(),
       ])
     } catch (error) {
@@ -167,6 +182,9 @@ export class Game {
         this.arena.addVillageProp(villageGltfs[i].scene, VILLAGE_PROPS[i])
       }
       this.arena.addFoliage(foliageGltf.scene, grassGltf.scene)
+      this.arena.addReeds(reedsGltf.scene)
+      this.arena.addWharf(wharfGltf.scene)
+      this.arena.addBoat(boatGltf.scene)
       this.arena.addPerimeter(perimeterGltf.scene)
       this.workshop = new Workshop(
         this.scene,
@@ -183,8 +201,12 @@ export class Game {
         'player',
         this.playerTemplate.clone(true),
         PLAYER_RIG,
-        new Vector3(PLAYER_SPAWN.x, 0, PLAYER_SPAWN.z),
-        PLAYER_SPAWN.yaw,
+        new Vector3(
+          POND_DEBUG ? POND.x + 4 : PLAYER_SPAWN.x,
+          0,
+          POND_DEBUG ? POND.z + POND.rz * 1.45 : PLAYER_SPAWN.z,
+        ),
+        POND_DEBUG ? Math.PI : PLAYER_SPAWN.yaw,
         'pl',
       )
     } catch (error) {
@@ -257,6 +279,29 @@ export class Game {
     this.update(dt)
     this.renderer.render(this.scene, this.cameraRig.camera)
     if (SHOW_FPS) this.tickFps(raw)
+  }
+
+  private tickFord(dt: number, bodies: Tank[]): void {
+    tickPond(bodies, this.arena.wind)
+    this.fordAcc += dt
+    if (this.fordAcc < 0.08) return
+    this.fordAcc = 0
+    const surface = pondWaterY()
+    for (const tank of bodies) {
+      if (!tank.alive || !pondContains(tank.position.x, tank.position.z)) continue
+      const spd = Math.hypot(tank.vx, tank.vz)
+      if (spd < 0.55) continue
+      const yaw = tank.hullYaw
+      const sin = Math.sin(yaw)
+      const cos = Math.cos(yaw)
+      const x = tank.position.x - sin * 0.35
+      const z = tank.position.z - cos * 0.35
+      const side = tank.trackOffset
+      _fxAt.set(x + cos * side, surface + 0.08, z - sin * side)
+      this.fx.wade(_fxAt, spd)
+      _fxAt.set(x - cos * side, surface + 0.08, z + sin * side)
+      this.fx.wade(_fxAt, spd)
+    }
   }
 
   private tickFps(rawDt: number): void {
@@ -350,6 +395,7 @@ export class Game {
     this.tickArtillery(dt)
     this.tickStukas(dt)
     this.tracks.update(dt)
+    this.tickFord(dt, bodies)
     this.fx.update(dt)
     this.updateProjectiles(dt)
 

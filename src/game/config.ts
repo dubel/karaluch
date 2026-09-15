@@ -96,6 +96,9 @@ export const PERIMETER_URL = new URL(
 export const FOLIAGE_URL = new URL('../../assets/low_poly_trees_flowers_and_grass.glb', import.meta.url).href
 export const GRASS_PATCH_URL = new URL('../../assets/grass_patches_-_circle.glb', import.meta.url).href
 export const ROAD_DIFF_URL = new URL('../../assets/textures/muddy_tracks_diff_2k.jpg', import.meta.url).href
+export const WHARF_URL = new URL('../../assets/the_wharf___lake_sea.glb', import.meta.url).href
+export const BOAT_URL = new URL('../../assets/old_boat.glb', import.meta.url).href
+export const REEDS_URL = new URL('../../assets/reeds_low_poly.glb', import.meta.url).href
 export const TREE_HEIGHT = 9.5
 export const TKS_LENGTH = 2.6
 export const PLAYER_SPAWN = { x: -96, z: 88, yaw: Math.PI * 0.72 }
@@ -114,6 +117,7 @@ export const KID_MODE = parseFlag(kidParam) || kidParam?.trim().toLowerCase() ==
 export const STAS_CONTROLS = kidParam?.trim().toLowerCase() === 'stas'
 export const STUKA_DEBUG = parseFlag(new URLSearchParams(window.location.search).get('stuka'))
 export const SHOW_FPS = parseFlag(new URLSearchParams(window.location.search).get('fps'))
+export const POND_DEBUG = parseFlag(new URLSearchParams(window.location.search).get('pond'))
 export const ENEMY_ACCURACY = KID_MODE ? 0.05 : 0.8
 export const ARTY_SHELLS_PER_TANK = 5
 export const ARTY_HIT_CHANCE = 0.8

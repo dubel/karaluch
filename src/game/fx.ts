@@ -13,7 +13,7 @@ import {
   type Scene,
 } from 'three'
 
-type Kind = 'spark' | 'smoke' | 'fire' | 'dirt'
+type Kind = 'spark' | 'smoke' | 'fire' | 'dirt' | 'splash'
 type Particle = {
   kind: Kind
   x: number
@@ -110,6 +110,11 @@ export class CombatFx {
     for (let i = 0; i < 12; i++) this.spawnDirt(at)
     for (let i = 0; i < 5; i++) this.spawnSmoke(at, 2.4, 1.05 + Math.random() * 0.7)
     this.flash(at)
+  }
+
+  wade(at: Vector3, speed: number): void {
+    const n = 2 + Math.min(4, Math.floor(speed * 0.35))
+    for (let i = 0; i < n; i++) this.spawnSplash(at, speed)
   }
 
   igniteWreck(at: Vector3, height: number): void {
@@ -265,6 +270,23 @@ export class CombatFx {
     p.max = 0.7 + Math.random() * 1.2
     p.size = 0.18
   }
+
+  private spawnSplash(at: Vector3, speed: number): void {
+    const p = takeParticle(this.sparkList, this.sparkSpare, SPARK_MAX)
+    if (!p) return
+    const dir = randDir()
+    const v = 2.4 + speed * 0.45 + Math.random() * 2.2
+    p.kind = 'splash'
+    p.x = at.x + dir.x * 0.18
+    p.y = at.y
+    p.z = at.z + dir.z * 0.18
+    p.vx = dir.x * v * 0.55
+    p.vy = 2.8 + Math.random() * 3.4
+    p.vz = dir.z * v * 0.55
+    p.life = 0
+    p.max = 0.28 + Math.random() * 0.28
+    p.size = 0.14
+  }
 }
 
 function takeParticle(list: Particle[], spare: Particle[], cap: number): Particle | null {
@@ -314,6 +336,10 @@ function stepSparks(
       p.vy -= 28 * dt
       p.vx *= Math.exp(-1.4 * dt)
       p.vz *= Math.exp(-1.4 * dt)
+    } else if (p.kind === 'splash') {
+      p.vy -= 26 * dt
+      p.vx *= Math.exp(-1.8 * dt)
+      p.vz *= Math.exp(-1.8 * dt)
     } else {
       p.vy -= 18 * dt
     }
@@ -332,6 +358,9 @@ function stepSparks(
     } else if (p.kind === 'dirt') {
       const fade = 1 - t
       _c.setRGB(0.42 * fade, 0.26 * fade, 0.1 * fade)
+    } else if (p.kind === 'splash') {
+      const fade = 1 - t
+      _c.setRGB(0.62 * fade, 0.82 * fade, 0.88 * fade)
     } else {
       _c.setRGB(1, 0.7 - t * 0.4, 0.15)
     }

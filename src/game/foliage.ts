@@ -15,6 +15,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { Aabb } from './collision'
 import { ARENA_HALF, BOT_SPAWN, PLAYER_SPAWN, TREE_HEIGHT, WINDMILL_PROP, WORKSHOP, WORKSHOP_RADIUS } from './config'
 import { roadDistance } from './road'
+import { nearWharf, pondU, POND } from './pond'
 import { stripJunk } from './rig'
 import { terrainHeight } from './terrain'
 
@@ -202,6 +203,45 @@ export function sowFoliage(
   }
 }
 
+export function sowReeds(scene: Scene, pack: Object3D, wind: WindClock): void {
+  stripJunk(pack)
+  pack.updateMatrixWorld(true)
+  const reed = bakeProto(pack, 'reeds', { targetHeight: 1.85, wind: 0.14 })
+  attachWind(wind, reed)
+  const rng = mulberry32(0xc4a11e)
+  const spots = scatterReeds(0.78, rng)
+  plant(scene, reed, spots, { slope: 0.12, tint: false, rng, wind })
+}
+
+function scatterReeds(cell: number, rng: () => number): Spot[] {
+  const spots: Spot[] = []
+  const pad = Math.max(POND.rx, POND.rz) * 1.42
+  const x0 = POND.x - pad
+  const z0 = POND.z - pad
+  const x1 = POND.x + pad
+  const z1 = POND.z + pad
+  for (let z = z0; z <= z1; z += cell) {
+    for (let x = x0; x <= x1; x += cell) {
+      const px = x + (rng() - 0.5) * cell * 0.9
+      const pz = z + (rng() - 0.5) * cell * 0.9
+      const u = pondU(px, pz)
+      if (u < 0.7 || u > 1.24) continue
+      if (nearWharf(px, pz)) continue
+      const shore = 1 - Math.min(1, Math.abs(u - 0.97) / 0.28)
+      if (rng() > 0.18 + shore * 0.78) continue
+      const clump = Math.sin(px * 0.29 + 1.1) * Math.sin(pz * 0.25 + 0.4)
+      if (clump < -0.42 && rng() < 0.62) continue
+      spots.push({
+        x: px,
+        z: pz,
+        yaw: rng() * Math.PI * 2,
+        scale: 0.72 + rng() * 0.7,
+      })
+    }
+  }
+  return spots
+}
+
 function attachWind(wind: WindClock, ...protos: Proto[]): void {
   for (const proto of protos) {
     for (const part of proto.parts) {
@@ -357,6 +397,8 @@ function scatter(
       if (Math.hypot(px - WORKSHOP.x, pz - WORKSHOP.z) < Math.max(opts.spawn * 0.55, WORKSHOP_RADIUS + 2.5)) continue
       const roadClear = opts.road ?? 0
       if (roadClear > 0 && roadDistance(px, pz) < roadClear) continue
+      if (pondU(px, pz) < 1.16) continue
+      if (nearWharf(px, pz)) continue
       if (opts.grove > 0) {
         const grove = Math.sin(px * 0.039 + 1.7) * Math.sin(pz * 0.034 + 0.4)
         if (grove < -0.18 && rng() < opts.grove) continue

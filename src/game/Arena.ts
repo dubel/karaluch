@@ -8,6 +8,7 @@ import {
   RepeatWrapping,
   SRGBColorSpace,
   Scene,
+  Vector2,
   Vector3,
   type Object3D,
   type PerspectiveCamera,
@@ -15,9 +16,10 @@ import {
 } from 'three'
 import { AabbIndex, type Aabb } from './collision'
 import { ARENA_HALF, HOUSE_TARGET_LENGTH, type VillageProp } from './config'
-import { sowFoliage, type WindClock } from './foliage'
+import { sowFoliage, sowReeds, type WindClock } from './foliage'
 import { installPerimeter } from './perimeter'
 import { createRoadMesh, installRoadGrade } from './road'
+import { addPond, installPondBasin, paintBeachVertices, placeBoat, placeWharf, POND } from './pond'
 import { normalizeModel, stripJunk } from './rig'
 import { displaceTerrain } from './terrain'
 import { Atmosphere, atmosWetness } from './atmosphere'
@@ -51,11 +53,14 @@ export class Arena {
     const groundGeo = new PlaneGeometry(ARENA_HALF * 2.18, ARENA_HALF * 2.18, 256, 256)
     groundGeo.rotateX(-Math.PI / 2)
     installRoadGrade()
+    installPondBasin()
     displaceTerrain(groundGeo)
+    paintBeachVertices(groundGeo)
     this.groundMat = makeGrassMaterial()
     const ground = new Mesh(groundGeo, this.groundMat)
     ground.receiveShadow = true
     scene.add(ground)
+    addPond(scene, this.wind)
   }
 
   addPerimeter(pack: Object3D): void {
@@ -145,6 +150,18 @@ export class Arena {
   addFoliage(foliagePack: Object3D, grassPack: Object3D): void {
     sowFoliage(this.scene, foliagePack, grassPack, this.obstacles, this.cameraBlockers, this.cover, this.wind)
   }
+
+  addReeds(pack: Object3D): void {
+    sowReeds(this.scene, pack, this.wind)
+  }
+
+  addWharf(model: Object3D): void {
+    placeWharf(this.scene, model, this.obstacles, this.cameraBlockers)
+  }
+
+  addBoat(model: Object3D): void {
+    placeBoat(this.scene, model, this.obstacles, this.cameraBlockers)
+  }
 }
 
 function rigMillSails(model: Object3D): { pivot: Object3D; axis: Vector3 } {
@@ -162,17 +179,22 @@ function makeGrassMaterial(): MeshStandardMaterial {
     map,
     roughness: 0.94,
     metalness: 0.02,
+    vertexColors: true,
   })
-  material.customProgramCacheKey = () => 'arena-grass-field'
+  material.customProgramCacheKey = () => 'arena-grass-field-beach-v5'
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uWetness = atmosWetness
+    shader.uniforms.uPond = { value: new Vector3(POND.x, POND.z, POND.yaw) }
+    shader.uniforms.uPondRadii = { value: new Vector2(POND.rx, POND.rz) }
     shader.vertexShader = `varying vec3 vWorldPos;\n${shader.vertexShader}`.replace(
-      'vViewPosition = - mvPosition.xyz;',
-      `vViewPosition = - mvPosition.xyz;
+      '#include <project_vertex>',
+      `#include <project_vertex>
 	vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
     )
     shader.fragmentShader = `varying vec3 vWorldPos;
 uniform float uWetness;
+uniform vec3 uPond;
+uniform vec2 uPondRadii;
 float hash12(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
 	p3 += dot(p3, p3.yzx + 33.33);
@@ -198,9 +220,17 @@ float fbm(vec2 p) {
 	}
 	return v;
 }
-${shader.fragmentShader}`.replace(
-      'diffuseColor *= sampledDiffuseColor;',
-      `diffuseColor *= sampledDiffuseColor;
+float pondU(vec2 wp) {
+	vec2 d = wp - uPond.xy;
+	float c = cos(uPond.z);
+	float s = sin(uPond.z);
+	vec2 l = vec2(d.x * c + d.y * s, -d.x * s + d.y * c);
+	return length(l / uPondRadii);
+}
+${shader.fragmentShader}`
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
 	vec2 wp = vWorldPos.xz;
 	float n = fbm(wp * 0.07);
 	float n2 = fbm(wp * 0.022 + 9.4);
@@ -214,8 +244,22 @@ ${shader.fragmentShader}`.replace(
 	diffuseColor.rgb = mix(diffuseColor.rgb, dirt, smoothstep(0.58, 0.86, n3) * 0.65);
 	float yard = 1.0 - smoothstep(6.0, 15.0, length(wp) + (n2 - 0.5) * 5.0);
 	diffuseColor.rgb = mix(diffuseColor.rgb, mud, yard * 0.62);
-	diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.46, 0.5, 0.52), uWetness * 0.78);`,
-    )
+	float pu = pondU(wp);
+	float shore = 1.0 - smoothstep(0.88, 1.34, pu);
+	vec3 gold = vec3(0.52, 0.4, 0.18);
+	vec3 wet = vec3(0.28, 0.22, 0.14);
+	diffuseColor.rgb = mix(diffuseColor.rgb, mix(gold, wet, smoothstep(0.7, 1.12, pu)), shore * 0.9);
+	diffuseColor.rgb *= 1.0 - shore * 0.18;`,
+      )
+      .replace(
+        '#include <color_fragment>',
+        `float beach = vColor.r;
+	vec3 sand = mix(vec3(0.88, 0.72, 0.38), vec3(0.58, 0.44, 0.22), vColor.g);
+	sand += (hash12(vWorldPos.xz * 18.0) - 0.5) * 0.08;
+	diffuseColor.rgb = mix(diffuseColor.rgb, sand, beach);
+	diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.46, 0.5, 0.52), uWetness * 0.78 * (1.0 - beach * 0.55));
+`,
+      )
   }
   return material
 }

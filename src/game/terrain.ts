@@ -80,6 +80,11 @@ export function setTerrainGrade(fn: GradeFn | null): void {
   gradeFn = fn
 }
 
+export function wrapTerrainGrade(fn: GradeFn): void {
+  const prev = gradeFn
+  gradeFn = prev ? (x, z, raw) => fn(x, z, prev(x, z, raw)) : fn
+}
+
 export function terrainHeight(x: number, z: number): number {
   const raw = rawTerrainHeight(x, z)
   return gradeFn ? gradeFn(x, z, raw) : raw

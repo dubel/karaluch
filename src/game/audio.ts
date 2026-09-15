@@ -13,6 +13,8 @@ const BIRD_OGG = new URL('../../assets/sfx/bird_robin.ogg', import.meta.url).hre
 const BIRD_AAC = new URL('../../assets/sfx/bird_robin.m4a', import.meta.url).href
 /** Jericho-Trompete: Alexander / OrangeFreeSounds, CC BY 4.0. */
 const STUKA_SIREN_URL = new URL('../../assets/sfx/stuka_siren.mp3', import.meta.url).href
+/** Joseph Sardin / BigSoundBank, CC0 — small pond splash. */
+const SPLASH_URL = new URL('../../assets/sfx/water_splash.wav', import.meta.url).href
 
 const SILENT_WAV =
   'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
@@ -83,6 +85,7 @@ export class GameAudio {
       ['thunderNear', pick(THUNDER_NEAR_OGG, THUNDER_NEAR_AAC)],
       ['thunderFar', pick(THUNDER_FAR_OGG, THUNDER_FAR_AAC)],
       ['bird', pick(BIRD_OGG, BIRD_AAC)],
+      ['splash', SPLASH_URL],
     ] as const
     await Promise.all(
       jobs.map(async ([name, url]) => {
@@ -170,6 +173,10 @@ export class GameAudio {
 
   hit(): void {
     this.play('hit', 0.55, 0.9 + Math.random() * 0.2)
+  }
+
+  splash(volume: number): void {
+    this.play('splash', volume, 0.92 + Math.random() * 0.14)
   }
 
   explode(): void {

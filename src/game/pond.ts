@@ -97,6 +97,11 @@ export function pondContains(x: number, z: number): boolean {
   return pondU(x, z) < 1
 }
 
+/** Hull is actually in the water, not just on the beach inside the pond ellipse. */
+export function pondWading(x: number, z: number, hullY: number): boolean {
+  return pondContains(x, z) && hullY < waterY - 0.1
+}
+
 /** One-time vertex mask on the terrain mesh — follows the slope, no extra draw. */
 export function paintBeachVertices(geo: BufferGeometry): void {
   const pos = geo.getAttribute('position')

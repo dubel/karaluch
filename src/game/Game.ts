@@ -51,7 +51,7 @@ import { ArtilleryBarrage } from './artillery'
 import { Workshop } from './workshop'
 import { GAME_DAY_SECONDS, artilleryCooldownSeconds } from './atmosphere'
 import { StukaRaid, STUKA_BLAST } from './stuka'
-import { pondContains, pondWaterY, tickPond, POND } from './pond'
+import { pondWading, pondWaterY, tickPond, POND } from './pond'
 import { releaseIntroMusic } from '../ui/intro'
 import { formatHeldTime, type Hud } from '../ui/hud'
 
@@ -103,6 +103,7 @@ export class Game {
   private fpsFrames = 0
   private fpsAcc = 0
   private fordAcc = 0
+  private splashCd = 0
 
   constructor(canvas: HTMLCanvasElement, hud: Hud) {
     this.hud = hud
@@ -283,12 +284,14 @@ export class Game {
 
   private tickFord(dt: number, bodies: Tank[]): void {
     tickPond(bodies, this.arena.wind)
+    this.splashCd = Math.max(0, this.splashCd - dt)
     this.fordAcc += dt
     if (this.fordAcc < 0.08) return
     this.fordAcc = 0
     const surface = pondWaterY()
+    let splashVol = 0
     for (const tank of bodies) {
-      if (!tank.alive || !pondContains(tank.position.x, tank.position.z)) continue
+      if (!tank.alive || !pondWading(tank.position.x, tank.position.z, tank.position.y)) continue
       const spd = Math.hypot(tank.vx, tank.vz)
       if (spd < 0.55) continue
       const yaw = tank.hullYaw
@@ -301,6 +304,12 @@ export class Game {
       this.fx.wade(_fxAt, spd)
       _fxAt.set(x - cos * side, surface + 0.08, z + sin * side)
       this.fx.wade(_fxAt, spd)
+      const gain = tank.id === 'player' ? 0.48 : 0.22
+      splashVol = Math.max(splashVol, gain * Math.min(1, spd / 5.5))
+    }
+    if (splashVol > 0 && this.splashCd <= 0) {
+      this.audio.splash(splashVol)
+      this.splashCd = 0.45 + Math.random() * 0.12
     }
   }
 
